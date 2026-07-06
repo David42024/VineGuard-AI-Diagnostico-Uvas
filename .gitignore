@@ -1,0 +1,39 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Datasets e Imágenes
+dataset/
+dataset_original/
+*.zip
+*.tar.gz
+
+# Modelos entrenados y pesados
+models/
+*.h5
+*.npy
+*.png
+*.jpg
+*.jpeg
+
+# Python cache y compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Jupyter Notebooks específicos
+DiagnosticoUvas.ipynb
+DiagnosticoUvasNModelos.ipynb
+
+# Configuración local de Streamlit y reportes temporales
+.streamlit/
+*.pdf
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
