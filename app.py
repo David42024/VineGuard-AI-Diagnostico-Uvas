@@ -3,6 +3,13 @@ VineGuard AI - Sistema de Diagnóstico de Enfermedades en Uvas
 Versión optimizada con Pruebas Estadísticas (Matthews y McNemar) + Multiidioma
 """
 
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+elif hasattr(sys.stdout, 'buffer'):
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,13 +22,31 @@ except ImportError:
     def img_to_array(img, **kwargs):
         return np.array(img, dtype=np.float32)
 import os
+import sys
 import time
+from pathlib import Path
 from datetime import datetime
 import pandas as pd
 import base64
 from scipy import stats
 from sklearn.metrics import matthews_corrcoef, confusion_matrix
 import tempfile
+try:
+    import joblib
+    HAS_JOBLIB = True
+except ImportError:
+    HAS_JOBLIB = False
+
+# Agregar src/ al path para importar extract_features
+_SRC_PATH = Path(__file__).resolve().parent / "src"
+if str(_SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(_SRC_PATH))
+
+try:
+    from extract_features import extract_single_image_features
+    HAS_EXTRACT = True
+except ImportError:
+    HAS_EXTRACT = False
 
 # ======= CONFIGURACIÓN MULTIIDIOMA =======
 TRANSLATIONS = {
@@ -34,6 +59,8 @@ TRANSLATIONS = {
         'load_models': '🚀 Cargar Modelos',
         'models_ready': '✅ Modelos listos',
         'available_models': '📊 Modelos Disponibles',
+        'best_model': '🏆 Mejor Modelo',
+        'model_ranking': '📊 Ranking de Modelos',
         'info_title': 'ℹ️ Información',
         'info_description': '''Esta aplicación utiliza modelos de deep learning para detectar enfermedades en hojas de vid:
         
@@ -102,6 +129,8 @@ TRANSLATIONS = {
         'load_models': '🚀 Load Models',
         'models_ready': '✅ Models ready',
         'available_models': '📊 Available Models',
+        'best_model': '🏆 Best Model',
+        'model_ranking': '📊 Model Ranking',
         'info_title': 'ℹ️ Information',
         'info_description': '''This application uses deep learning models to detect diseases in vine leaves:
         
@@ -170,6 +199,8 @@ TRANSLATIONS = {
         'load_models': '🚀 Carregar Modelos',
         'models_ready': '✅ Modelos prontos',
         'available_models': '📊 Modelos Disponíveis',
+        'best_model': '🏆 Melhor Modelo',
+        'model_ranking': '📊 Ranking de Modelos',
         'info_title': 'ℹ️ Informação',
         'info_description': '''Esta aplicação usa modelos de deep learning para detectar doenças em folhas de videira:
         
@@ -582,13 +613,39 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Configuración de modelos y clases
-MODEL_PATHS = {
-    "CNN Simple": "models/cnn_simple.h5",
-    "MobileNetV2": "models/mobilenetv2.h5",
-    "EfficientNet": "models/efficientnetb0.h5",
-    "DenseNet": "models/densenet121.h5"
+# Configuración de los 5 modelos: 3 clásicos + 2 híbridos
+MODELS_CONFIG = {
+    "M1 - SVM": {
+        "type": "classic",
+        "path": "models/svm_model.pkl",
+        "description": "Support Vector Machine (RBF) + características manuales",
+    },
+    "M2 - Random Forest": {
+        "type": "classic",
+        "path": "models/random_forest_model.pkl",
+        "description": "Random Forest (200 árboles) + características manuales",
+    },
+    "M3 - KNN": {
+        "type": "classic",
+        "path": "models/knn_model.pkl",
+        "description": "K-Nearest Neighbors (k=5) + características manuales",
+    },
+    "H1 - CNN + SVM": {
+        "type": "hybrid_cnn_svm",
+        "extractor_path": "models/cnn_feature_extractor.h5",
+        "classifier_path": "models/cnn_svm_model.pkl",
+        "description": "CNN extractor de features + clasificador SVM",
+    },
+    "H2 - Transfer + RF": {
+        "type": "hybrid_transfer_rf",
+        "extractor_path": "models/transfer_feature_extractor.h5",
+        "classifier_path": "models/transfer_random_forest_model.pkl",
+        "description": "MobileNetV2 (ImageNet) + Random Forest",
+    },
 }
+
+# Mantener MODEL_PATHS para compatibilidad con partes del código que lo referencian
+MODEL_PATHS = {k: v.get("path", v.get("extractor_path", "")) for k, v in MODELS_CONFIG.items()}
 
 # Clases de enfermedades (keys en inglés para consistencia)
 DISEASE_CLASSES = ["Black_rot", "Esca", "Healthy", "Leaf_blight"]
@@ -685,6 +742,68 @@ def get_disease_folders(language='es'):
             }
         }
 
+# Función para cargar ranking de modelos
+def load_model_ranking():
+    ranking_path = Path("reports/modelos/ranking_modelos.csv")
+    best_path = Path("reports/modelos/mejor_modelo.txt")
+    if ranking_path.exists():
+        df = pd.read_csv(ranking_path)
+        ranking_data = df.to_dict('records')
+    else:
+        ranking_data = None
+    best_model_name = None
+    if best_path.exists():
+        with open(best_path, 'r', encoding='utf-8') as f:
+            best_model_name = f.read().strip()
+    return ranking_data, best_model_name
+
+def check_pipeline_status():
+    checks = {
+        "eda": {
+            "label_es": "EDA - Análisis exploratorio",
+            "label_en": "EDA - Exploratory analysis",
+            "label_pt": "EDA - Análise exploratória",
+            "files": [Path("reports/eda/resumen_dataset.csv"), Path("reports/eda/distribucion_clases.png")],
+        },
+        "preprocessing": {
+            "label_es": "Preprocesamiento y aumento",
+            "label_en": "Preprocessing & augmentation",
+            "label_pt": "Pré-processamento e aumento",
+            "files": [Path("reports/preprocessing/ejemplos_aumento_datos.png")],
+        },
+        "crossval": {
+            "label_es": "Validación cruzada (5-folds)",
+            "label_en": "Cross-validation (5-fold)",
+            "label_pt": "Validação cruzada (5-fold)",
+            "files": [Path("reports/modelos/cross_validation_resultados.csv")],
+        },
+        "hyperparam": {
+            "label_es": "Optimización de hiperparámetros",
+            "label_en": "Hyperparameter optimization",
+            "label_pt": "Otimização de hiperparâmetros",
+            "files": [Path("reports/modelos/mejores_hiperparametros.csv")],
+        },
+        "statistical": {
+            "label_es": "Validación estadística",
+            "label_en": "Statistical validation",
+            "label_pt": "Validação estatística",
+            "files": [Path("reports/estadistica/mcnemar_resultados.csv")],
+        },
+        "model_selection": {
+            "label_es": "Selección del mejor modelo",
+            "label_en": "Best model selection",
+            "label_pt": "Seleção do melhor modelo",
+            "files": [Path("reports/modelos/ranking_modelos.csv")],
+        },
+    }
+    lang = st.session_state.get("language", "es")
+    results = {}
+    for key, check in checks.items():
+        done = all(f.exists() for f in check["files"])
+        label = check.get(f"label_{lang}", check["label_es"])
+        results[key] = {"done": done, "label": label}
+    return results
+
 # Inicializar estado de sesión
 if 'models_loaded' not in st.session_state:
     st.session_state.models_loaded = False
@@ -694,69 +813,174 @@ if 'models_loaded' not in st.session_state:
     st.session_state.statistical_analysis = None
     st.session_state.mcnemar_validation = None
     st.session_state.mcnemar_analysis = None
+    st.session_state.ranking_data, st.session_state.best_model_name = load_model_ranking()
+    st.session_state.pdf_bytes = None
+    st.session_state.pdf_ready = False
 
-# Función para cargar modelos
+# ─── Carga de modelos ────────────────────────────────────────────────────────
 @st.cache_resource
 def load_models():
-    """Carga todos los modelos pre-entrenados"""
-    models = {}
-    for name, path in MODEL_PATHS.items():
-        if os.path.exists(path):
-            try:
-                models[name] = tf.keras.models.load_model(path)
-                print(f"✓ Modelo {name} cargado exitosamente")
-            except Exception as e:
-                st.error(f"Error al cargar {name}: {str(e)}")
-        else:
-            st.warning(f"No se encontró el modelo {name} en {path}")
-    return models
+    """
+    Carga los 5 modelos:
+      - M1 SVM, M2 RF, M3 KNN  → joblib (.pkl)
+      - H1 CNN+SVM              → TF extractor (.h5) + joblib SVM (.pkl)
+      - H2 Transfer+RF          → TF extractor (.h5) + joblib RF (.pkl)
+    Retorna dict con objetos listos para inferencia.
+    """
+    loaded = {}
+    for name, cfg in MODELS_CONFIG.items():
+        model_type = cfg["type"]
+        try:
+            if model_type == "classic":
+                path = cfg["path"]
+                if os.path.exists(path):
+                    loaded[name] = {"type": model_type, "clf": joblib.load(path)}
+                    print(f"✓ {name} cargado desde {path}")
+                else:
+                    st.warning(f"⚠️ Modelo no encontrado: {path}")
 
-# Función para preprocesar imagen
-def preprocess_image(image, target_size=(224, 224), model_name=None):
-    """Preprocesa la imagen para los modelos"""
-    # Convertir PIL a array
+            elif model_type in ("hybrid_cnn_svm", "hybrid_transfer_rf"):
+                ext_path = cfg["extractor_path"]
+                clf_path = cfg["classifier_path"]
+                if os.path.exists(ext_path) and os.path.exists(clf_path):
+                    extractor = tf.keras.models.load_model(ext_path)
+                    clf = joblib.load(clf_path)
+                    loaded[name] = {
+                        "type": model_type,
+                        "extractor": extractor,
+                        "clf": clf,
+                    }
+                    print(f"✓ {name} cargado")
+                else:
+                    missing = [p for p in [ext_path, clf_path] if not os.path.exists(p)]
+                    st.warning(f"⚠️ Archivos no encontrados para {name}: {missing}")
+
+        except Exception as e:
+            st.error(f"Error al cargar {name}: {str(e)}")
+
+    return loaded
+
+
+# ─── Preprocesamiento por tipo de modelo ────────────────────────────────────
+
+def preprocess_for_classic(image):
+    """
+    Para modelos clásicos (SVM, RF, KNN):
+    Extrae características manuales con extract_features.py y aplica el scaler.
+    Retorna array numpy (1, n_features).
+    """
+    if HAS_EXTRACT:
+        return extract_single_image_features(image)
+    # Fallback sin scikit-image: histograma + estadísticas RGB planas
+    img = image.resize((224, 224))
+    arr = np.array(img, dtype=np.float32)
+    feats = []
+    for c in range(3):
+        ch = arr[:, :, c]
+        feats.extend([ch.mean(), ch.std(), ch.var()])
+        hist, _ = np.histogram(ch, bins=64, range=(0, 256))
+        hist = hist.astype(np.float32)
+        if hist.sum() > 0:
+            hist /= hist.sum()
+        feats.extend(hist.tolist())
+    return np.array(feats, dtype=np.float32).reshape(1, -1)
+
+
+def preprocess_for_cnn_extractor(image, target_size=(224, 224)):
+    """
+    Para H1 (CNN extractor): normaliza la imagen a [0, 1].
+    Retorna tensor (1, H, W, 3).
+    """
     img = image.resize(target_size)
-    img_array = img_to_array(img)
+    arr = np.array(img, dtype=np.float32) / 255.0
+    return np.expand_dims(arr, axis=0)
 
-    if model_name == "ResNet50":
-        # ResNet50 requiere preprocesamiento especial
-        img_array = tf.keras.applications.resnet50.preprocess_input(img_array)
-    elif model_name == "EfficientNet":
-        # EfficientNet también requiere preprocesamiento especial
-        img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
-    else:
-        # Normalizar
-        img_array = img_array / 255.0
 
-    # Expandir dimensiones
-    img_array = np.expand_dims(img_array, axis=0)
+def preprocess_for_transfer_extractor(image, target_size=(224, 224)):
+    """
+    Para H2 (MobileNetV2): aplica preprocess_input de MobileNetV2.
+    Retorna tensor (1, H, W, 3) en rango [-1, 1].
+    """
+    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+    img = image.resize(target_size)
+    arr = np.array(img, dtype=np.float32)
+    arr = preprocess_input(arr)
+    return np.expand_dims(arr, axis=0)
 
-    return img_array
 
-# Función para hacer predicciones
-def predict_disease(image, model, model_name):
-    """Realiza predicción con un modelo específico"""
-    # Preprocesar imagen con el modelo específico
-    processed_img = preprocess_image(image, model_name=model_name)
+# Función legacy para mantener compatibilidad con código existente
+def preprocess_image(image, target_size=(224, 224), model_name=None):
+    """Preprocesa imagen (legacy — redirige al preprocesamiento apropiado)."""
+    return preprocess_for_cnn_extractor(image, target_size)
 
-    # Predicción
+
+# ─── Predicción universal ────────────────────────────────────────────────────
+def predict_disease(image, model_bundle, model_name):
+    """
+    Realiza predicción con cualquiera de los 5 modelos.
+
+    Parameters
+    ----------
+    image        : PIL.Image
+    model_bundle : dict con claves 'type', 'clf' (y opcionalmente 'extractor')
+    model_name   : str — nombre visible del modelo
+
+    Returns
+    -------
+    dict con predicted_class, confidence, all_predictions, inference_time, etc.
+    """
+    model_type = model_bundle.get("type", "classic")
     start_time = time.time()
-    predictions = model.predict(processed_img, verbose=0)
+
+    if model_type == "classic":
+        # ── M1, M2, M3: características manuales ───────────────────────────
+        feats = preprocess_for_classic(image)           # (1, n_features)
+        clf = model_bundle["clf"]
+        proba = clf.predict_proba(feats)[0]             # (n_classes,)
+
+    elif model_type == "hybrid_cnn_svm":
+        # ── H1: CNN extractor → SVM ─────────────────────────────────────────
+        img_tensor = preprocess_for_cnn_extractor(image)   # (1, 224, 224, 3)
+        extractor = model_bundle["extractor"]
+        feats = extractor(img_tensor, training=False).numpy()  # (1, 256)
+        clf = model_bundle["clf"]
+        proba = clf.predict_proba(feats)[0]             # (n_classes,)
+
+    elif model_type == "hybrid_transfer_rf":
+        # ── H2: MobileNetV2 extractor → RF ─────────────────────────────────
+        img_tensor = preprocess_for_transfer_extractor(image)  # (1, 224, 224, 3)
+        extractor = model_bundle["extractor"]
+        feats = extractor(img_tensor, training=False).numpy()   # (1, 1280)
+        clf = model_bundle["clf"]
+        proba = clf.predict_proba(feats)[0]             # (n_classes,)
+
+    else:
+        raise ValueError(f"Tipo de modelo desconocido: {model_type}")
+
     inference_time = (time.time() - start_time) * 1000  # ms
 
-    # Obtener clase predicha
-    predicted_class_idx = np.argmax(predictions[0])
+    # Asegurar que proba tenga longitud = n_clases
+    n_classes = len(DISEASE_CLASSES)
+    if len(proba) < n_classes:
+        padded = np.zeros(n_classes, dtype=np.float32)
+        clf_classes = model_bundle["clf"].classes_
+        for i, cls_idx in enumerate(clf_classes):
+            if cls_idx < n_classes:
+                padded[cls_idx] = proba[i]
+        proba = padded
+
+    predicted_class_idx = int(np.argmax(proba))
     predicted_class = DISEASE_CLASSES[predicted_class_idx]
-    confidence = predictions[0][predicted_class_idx]
+    confidence = float(proba[predicted_class_idx])
 
     return {
         'model_name': model_name,
         'predicted_class': predicted_class,
         'predicted_class_es': get_disease_names(st.session_state.language)[predicted_class],
         'confidence': confidence,
-        'all_predictions': predictions[0],
+        'all_predictions': proba,
         'inference_time': inference_time,
-        'predicted_class_idx': predicted_class_idx  # Añadido para análisis estadístico
+        'predicted_class_idx': predicted_class_idx,
     }
 
 # ======= NUEVAS FUNCIONES ESTADÍSTICAS =======
@@ -1266,12 +1490,13 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
     # Obtener recomendaciones en el idioma actual
     recommendations = get_treatment_recommendations(consensus_disease, current_language)
 
-    # Datos de entrenamiento basados en las imágenes proporcionadas
+    # Datos de entrenamiento de los 5 modelos
     training_data = {
-        "CNN Simple": {"epochs": 10, "time": "4.2 h", "accuracy": "96.18%", "val_accuracy": "96.71%"},
-        "MobileNetV2": {"epochs": 10, "time": "3.8 h", "accuracy": "97.48%", "val_accuracy": "97.20%"},
-        "EfficientNet": {"epochs": 12, "time": "5.1 h", "accuracy": "98.88%", "val_accuracy": "99.01%"},
-        "DenseNet": {"epochs": 12, "time": "4.7 h", "accuracy": "98.20%", "val_accuracy": "98.85%"}
+        "M1 - SVM": {"tipo": "Clásico", "description": "SVM kernel RBF", "features": "Color + LBP + Stats", "epochs": "N/A", "time": "N/A", "accuracy": "N/A", "val_accuracy": "N/A"},
+        "M2 - Random Forest": {"tipo": "Clásico", "description": "RF 200 árboles", "features": "Color + LBP + Stats", "epochs": "N/A", "time": "N/A", "accuracy": "N/A", "val_accuracy": "N/A"},
+        "M3 - KNN": {"tipo": "Clásico", "description": "KNN k=5", "features": "Color + LBP + Stats", "epochs": "N/A", "time": "N/A", "accuracy": "N/A", "val_accuracy": "N/A"},
+        "H1 - CNN + SVM": {"tipo": "Híbrido", "description": "CNN extractor + SVM", "features": "Deep CNN (256 dims)", "epochs": "N/A", "time": "N/A", "accuracy": "N/A", "val_accuracy": "N/A"},
+        "H2 - Transfer + RF": {"tipo": "Híbrido", "description": "MobileNetV2 + RF", "features": "ImageNet (1280 dims)", "epochs": "N/A", "time": "N/A", "accuracy": "N/A", "val_accuracy": "N/A"},
     }
 
     # Crear archivo temporal para el PDF
@@ -1591,33 +1816,89 @@ def main():
         else:
             st.success(get_text('models_ready', st.session_state.language))
 
-        # Bloque de Estado Informativo Compacto
-        status_badge_html = ""
-        if st.session_state.models_loaded:
-            status_badge_html = f'<span class="status-badge loaded">{"Cargados" if st.session_state.language == "es" else "Loaded" if st.session_state.language == "en" else "Carregados"}</span>'
-        else:
-            status_badge_html = f'<span class="status-badge not-loaded">{"No cargados" if st.session_state.language == "es" else "Not loaded" if st.session_state.language == "en" else "Não cargados"}</span>'
-            
+        # ── Panel de Sistema ──────────────────────────────────────────────
+        lang = st.session_state.language
+        t = lambda es, en, pt: es if lang == 'es' else en if lang == 'en' else pt
+
+        status_class = "loaded" if st.session_state.models_loaded else "not-loaded"
+        status_text = t("Cargados", "Loaded", "Carregados") if st.session_state.models_loaded else t("No cargados", "Not loaded", "Não carregados")
+
         models_list_html = "".join([f"<li>{name}</li>" for name in MODEL_PATHS.keys()])
         classes_list_html = "".join([f"<li>{get_disease_names(st.session_state.language)[cls]}</li>" for cls in DISEASE_CLASSES])
-        
+
+        # ── Mejor modelo ──────────────────────────────────────────────────
+        best_model_card = ""
+        if st.session_state.best_model_name:
+            name = st.session_state.best_model_name.split(":")[1].strip() if ":" in st.session_state.best_model_name else st.session_state.best_model_name
+            best_model_card = f"""
+            <div style="background:linear-gradient(135deg,#4a148c,#2e7d32);border-radius:12px;padding:14px;margin:12px 0;text-align:center;">
+                <div style="color:#ffd700;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;">
+                    {t("🏆 MEJOR MODELO","🏆 BEST MODEL","🏆 MELHOR MODELO")}
+                </div>
+                <div style="color:white;font-size:1.1rem;font-weight:800;margin-top:4px;">{name}</div>
+            </div>"""
+
+        # ── Ranking rápido ─────────────────────────────────────────────────
+        ranking_html = ""
+        if st.session_state.ranking_data:
+            top3 = st.session_state.ranking_data[:3]
+            items = []
+            for i, m in enumerate(top3):
+                rank_icon = ["🥇", "🥈", "🥉"][i]
+                raw = m.get("accuracy", m.get("puntaje", ""))
+                if isinstance(raw, (float, int)):
+                    score_str = f"{float(raw):.4f}"
+                else:
+                    score_str = str(raw)
+                items.append(f"<div style='display:flex;justify-content:space-between;padding:2px 0;font-size:0.8rem;'><span>{rank_icon} {m.get('modelo','')}</span><span style='font-weight:600;color:#4a148c;'>{score_str}</span></div>")
+            ranking_html = f"""
+            <div style="background:#f9f9fb;border-radius:10px;padding:10px;margin:8px 0;border:1px solid #edeef2;">
+                <div style="font-size:0.8rem;font-weight:700;color:#4a148c;margin-bottom:6px;">
+                    {t("📊 Ranking","📊 Ranking","📊 Ranking")}
+                </div>
+                {''.join(items)}
+            </div>"""
+
+        # ── Pipeline status ────────────────────────────────────────────────
+        pipeline = check_pipeline_status()
+        pipe_items = []
+        for key, p in pipeline.items():
+            icon = "✅" if p["done"] else "⬜"
+            pipe_items.append(f"<div style='display:flex;align-items:center;gap:6px;padding:1px 0;font-size:0.78rem;color:#424242;'><span>{icon}</span><span>{p['label']}</span></div>")
+
+        pipeline_html = f"""
+        <div style="background:#f9f9fb;border-radius:10px;padding:10px;margin:8px 0;border:1px solid #edeef2;">
+            <div style="font-size:0.8rem;font-weight:700;color:#4a148c;margin-bottom:6px;">
+                {t("⚙️ Pipeline de experimentos","⚙️ Experiment pipeline","⚙️ Pipeline de experimentos")}
+            </div>
+            {''.join(pipe_items)}
+        </div>"""
+
+        # ── Info block ─────────────────────────────────────────────────────
         info_block_html = f"""
         <div class="sidebar-info-block">
-            <h4 class="sidebar-info-title">📊 Info. del Sistema</h4>
-            <p class="sidebar-info-item"><span class="sidebar-info-label">Estado:</span> {status_badge_html}</p>
-            <p class="sidebar-info-item"><span class="sidebar-info-label">Modelos:</span>
-                <ul style="margin: 2px 0; padding-left: 20px; font-size: 0.8rem; color: #424242;">
-                    {models_list_html}
-                </ul>
+            <h4 class="sidebar-info-title">{t("📊 Info. del Sistema","📊 System Info","📊 Info. do Sistema")}</h4>
+            <p class="sidebar-info-item"><span class="sidebar-info-label">{t("Estado:","Status:","Estado:")}</span> <span class="status-badge {status_class}">{status_text}</span></p>
+            <p class="sidebar-info-item"><span class="sidebar-info-label">{t("Modelos:","Models:","Modelos:")}</span>
+                <ul style="margin:2px 0;padding-left:20px;font-size:0.8rem;color:#424242;">{models_list_html}</ul>
             </p>
-            <p class="sidebar-info-item"><span class="sidebar-info-label">Clases:</span>
-                <ul style="margin: 2px 0; padding-left: 20px; font-size: 0.8rem; color: #424242;">
-                    {classes_list_html}
-                </ul>
+            <p class="sidebar-info-item"><span class="sidebar-info-label">{t("Clases:","Classes:","Classes:")}</span>
+                <ul style="margin:2px 0;padding-left:20px;font-size:0.8rem;color:#424242;">{classes_list_html}</ul>
             </p>
         </div>
         """
         st.markdown(info_block_html, unsafe_allow_html=True)
+
+        # ── Best model card ────────────────────────────────────────────────
+        if best_model_card:
+            st.markdown(best_model_card, unsafe_allow_html=True)
+
+        # ── Ranking ────────────────────────────────────────────────────────
+        if ranking_html:
+            st.markdown(ranking_html, unsafe_allow_html=True)
+
+        # ── Pipeline ───────────────────────────────────────────────────────
+        st.markdown(pipeline_html, unsafe_allow_html=True)
 
         # Información
         st.markdown("---")
@@ -1657,8 +1938,8 @@ def main():
                 <div class="feature-card">
                     <span class="feature-icon">🧠</span>
                     <div class="feature-content">
-                        <h4>2. Modelos de Deep Learning</h4>
-                        <p>Consenso multimodelo utilizando CNN propia, MobileNetV2, EfficientNet y DenseNet.</p>
+                        <h4>2. Modelos Clásicos e Híbridos</h4>
+                        <p>5 modelos: SVM, Random Forest, KNN (clásicos) y CNN+SVM, MobileNetV2+RF (híbridos).</p>
                     </div>
                 </div>
                 <div class="feature-card">
@@ -1690,8 +1971,8 @@ def main():
                 <div class="feature-card">
                     <span class="feature-icon">🧠</span>
                     <div class="feature-content">
-                        <h4>2. Deep Learning Models</h4>
-                        <p>Multi-model consensus using proprietary CNN, MobileNetV2, EfficientNet, and DenseNet.</p>
+                        <h4>2. Classic &amp; Hybrid Models</h4>
+                        <p>5 models: SVM, Random Forest, KNN (classic) and CNN+SVM, MobileNetV2+RF (hybrid).</p>
                     </div>
                 </div>
                 <div class="feature-card">
@@ -1723,8 +2004,8 @@ def main():
                 <div class="feature-card">
                     <span class="feature-icon">🧠</span>
                     <div class="feature-content">
-                        <h4>2. Modelos de Deep Learning</h4>
-                        <p>Consenso multimodelo usando CNN própria, MobileNetV2, EfficientNet e DenseNet.</p>
+                        <h4>2. Modelos Clássicos e Híbridos</h4>
+                        <p>5 modelos: SVM, Random Forest, KNN (clássicos) e CNN+SVM, MobileNetV2+RF (híbridos).</p>
                     </div>
                 </div>
                 <div class="feature-card">
@@ -1809,6 +2090,8 @@ def main():
                             results.append(result)
 
                         st.session_state.predictions = results
+                        st.session_state.pdf_bytes = None
+                        st.session_state.pdf_ready = False
 
                 # Mostrar resultados si existen
                 if st.session_state.predictions:
@@ -1906,22 +2189,57 @@ def main():
                             for item in recommendations['prevencion']:
                                 st.write(f"• {item}")
 
+                    # Mostrar ranking de modelos
+                    if st.session_state.ranking_data:
+                        st.markdown("---")
+                        st.subheader(get_text('model_ranking', st.session_state.language))
+                        ranking_df = pd.DataFrame(st.session_state.ranking_data)
+                        if not ranking_df.empty and 'modelo' in ranking_df.columns:
+                            display_cols = [c for c in ['ranking', 'modelo', 'accuracy', 'f1_score', 'mcc'] if c in ranking_df.columns]
+                            if display_cols:
+                                st.dataframe(ranking_df[display_cols].head(10), use_container_width=True)
+
+                    # Matrices de confusión y curvas ROC
+                    cm_dir = Path("reports/modelos")
+                    cm_files = sorted(cm_dir.glob("confusion_*.png"))
+                    roc_files = sorted(cm_dir.glob("roc_*.png"))
+                    if cm_files or roc_files:
+                        st.markdown("---")
+                        st.subheader("📊 Matrices de Confusión")
+                        cm_cols = st.columns(min(len(cm_files), 5))
+                        for i, f in enumerate(cm_files):
+                            with cm_cols[i % len(cm_cols)]:
+                                model_label = f.stem.replace("confusion_", "").replace("_", " ").title()
+                                st.caption(model_label)
+                                st.image(str(f), use_column_width=True)
+                    if roc_files:
+                        st.subheader("📈 Curvas ROC (One-vs-Rest)")
+                        roc_cols = st.columns(min(len(roc_files), 5))
+                        for i, f in enumerate(roc_files):
+                            with roc_cols[i % len(roc_cols)]:
+                                model_label = f.stem.replace("roc_", "").replace("_", " ").title()
+                                st.caption(model_label)
+                                st.image(str(f), use_column_width=True)
+
                     # Botón para generar reporte
                     st.subheader(get_text('generate_report', st.session_state.language))
                     if st.button(get_text('download_pdf', st.session_state.language)):
                         with st.spinner(get_text('generating_report', st.session_state.language)):
-                            pdf_bytes = generate_diagnosis_pdf(
+                            st.session_state.pdf_bytes = generate_diagnosis_pdf(
                                 image,
                                 st.session_state.predictions,
                                 consensus
                             )
+                            st.session_state.pdf_ready = True
+                        st.rerun()
 
-                            st.download_button(
-                                label=get_text('download_pdf_button', st.session_state.language),
-                                data=pdf_bytes,
-                                file_name=f"diagnostico_vineguard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                                mime="application/pdf"
-                            )
+                    if st.session_state.get("pdf_ready") and st.session_state.get("pdf_bytes"):
+                        st.download_button(
+                            label=get_text('download_pdf_button', st.session_state.language),
+                            data=st.session_state.pdf_bytes,
+                            file_name=f"diagnostico_vineguard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                            mime="application/pdf"
+                        )
 
         else:  # Usar cámara
             st.info(get_text('camera_info', st.session_state.language))
@@ -2478,6 +2796,18 @@ def main():
             - Registro de aplicaciones
             - Evaluación de eficacia
             """)
+
+        # Sección de ranking y mejor modelo
+        if st.session_state.ranking_data:
+            st.markdown("---")
+            st.subheader("🏆 Ranking de Modelos")
+            ranking_df = pd.DataFrame(st.session_state.ranking_data)
+            if not ranking_df.empty and 'modelo' in ranking_df.columns:
+                display_cols = [c for c in ['ranking', 'modelo', 'accuracy', 'f1_score', 'mcc'] if c in ranking_df.columns]
+                if display_cols:
+                    st.dataframe(ranking_df[display_cols], use_container_width=True)
+                mejor = ranking_df.iloc[0] if 'ranking' in ranking_df.columns else ranking_df.iloc[0]
+                st.success(f"**Modelo recomendado:** {mejor['modelo']}")
 
         # Información sobre pruebas estadísticas
         st.subheader("📊 Sobre las Pruebas Estadísticas")

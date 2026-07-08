@@ -1,0 +1,2 @@
+modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,tiempo_entrenamiento_s,tiempo_inferencia_ms
+M1 — SVM (RBF),0.925,0.925,0.9289,0.925,0.9244,0.9016,0.08,0.04

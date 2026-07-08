@@ -1,0 +1,11 @@
+metrica,valor
+total_analizadas,600
+ancho_min,256
+ancho_max,256
+ancho_mean,256.0
+alto_min,256
+alto_max,256
+alto_mean,256.0
+n_rgb,600
+n_rgba,0
+n_otros,0

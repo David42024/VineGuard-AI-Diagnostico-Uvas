@@ -1,0 +1,6 @@
+Mejor modelo seleccionado: H2 - MobileNetV2+RF
+Justificación:
+- Obtuvo el mayor MCC (0.9673)
+- Obtuvo el mayor F1-Score (0.9747)
+- Obtuvo el mayor accuracy (0.9750)
+- Presentó el mejor rendimiento del ranking compuesto

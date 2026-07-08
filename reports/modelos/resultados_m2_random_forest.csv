@@ -1,0 +1,2 @@
+modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,tiempo_entrenamiento_s,tiempo_inferencia_ms
+M2 — Random Forest,0.9417,0.9417,0.9466,0.9417,0.9419,0.9237,0.41,0.64

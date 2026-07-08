@@ -1,0 +1,11 @@
+modelo_1,modelo_2,diff_accuracy,diff_f1_macro,diff_mcc,odds_ratio_mcnemar
+M1 - SVM,M2 - Random Forest,0.3917,0.5294,0.5549,0.1607
+M1 - SVM,M3 - KNN,0.3917,0.5323,0.539,0.254
+M1 - SVM,H1 - CNN+SVM,0.0,0.0,0.0,inf
+M1 - SVM,H2 - MobileNetV2+RF,0.725,0.8747,0.9673,0.0333
+M2 - Random Forest,M3 - KNN,0.0,0.0029,0.0159,1.0
+M2 - Random Forest,H1 - CNN+SVM,0.3917,0.5294,0.5549,6.2222
+M2 - Random Forest,H2 - MobileNetV2+RF,0.3333,0.3453,0.4124,0.0476
+M3 - KNN,H1 - CNN+SVM,0.3917,0.5323,0.539,3.9375
+M3 - KNN,H2 - MobileNetV2+RF,0.3333,0.3424,0.4283,0.0
+H1 - CNN+SVM,H2 - MobileNetV2+RF,0.725,0.8747,0.9673,0.0333

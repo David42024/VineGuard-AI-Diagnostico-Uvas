@@ -1,0 +1,11 @@
+b,c,statistic,p_value,interpretation,modelo_1,modelo_2
+9,56,33.2654,0.0,Diferencia altamente significativa (p < 0.001),M1 - SVM,M2 - Random Forest
+16,63,27.3703,0.0,Diferencia altamente significativa (p < 0.001),M1 - SVM,M3 - KNN
+0,0,0.0,1.0,No hay diferencias entre modelos,M1 - SVM,H1 - CNN+SVM
+3,90,80.4543,0.0,Diferencia altamente significativa (p < 0.001),M1 - SVM,H2 - MobileNetV2+RF
+16,16,0.0078,0.9296,No hay diferencia significativa (p >= 0.05),M2 - Random Forest,M3 - KNN
+56,9,33.2654,0.0,Diferencia altamente significativa (p < 0.001),M2 - Random Forest,H1 - CNN+SVM
+2,42,35.4602,0.0,Diferencia altamente significativa (p < 0.001),M2 - Random Forest,H2 - MobileNetV2+RF
+63,16,27.3703,0.0,Diferencia altamente significativa (p < 0.001),M3 - KNN,H1 - CNN+SVM
+0,40,39.0062,0.0,Diferencia altamente significativa (p < 0.001),M3 - KNN,H2 - MobileNetV2+RF
+3,90,80.4543,0.0,Diferencia altamente significativa (p < 0.001),H1 - CNN+SVM,H2 - MobileNetV2+RF

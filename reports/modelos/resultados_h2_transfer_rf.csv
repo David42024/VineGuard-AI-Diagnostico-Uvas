@@ -1,0 +1,2 @@
+modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,tiempo_entrenamiento_s,tiempo_inferencia_ms
+H2 — Transfer Learning (MobileNetV2) + RF,0.975,0.975,0.9763,0.975,0.9747,0.9673,18.94,0.34

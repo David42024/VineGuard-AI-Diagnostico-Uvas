@@ -36,4 +36,12 @@ DiagnosticoUvasNModelos.ipynb
 
 # Archivos del sistema operativo
 .DS_Store
-Thumbs.db
+Thumbs.dbmodels y dataset_original.rar
+*.rar
+models y dataset_original.rar
+*.rar
+dataset_original/
+dataset/
+models/
+*.h5
+*.keras

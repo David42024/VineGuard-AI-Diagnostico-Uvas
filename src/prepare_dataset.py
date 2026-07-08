@@ -1,3 +1,14 @@
+"""
+prepare_dataset.py
+──────────────────
+Divide el dataset original en:
+  • 80 % train
+  • 20 % test
+
+No se crea carpeta 'val'. Los modelos que necesiten validación interna
+usan validation_split durante el entrenamiento.
+"""
+
 import shutil
 import random
 
@@ -5,30 +16,29 @@ from mantenedor import (
     DATASET_ORIGINAL_DIR,
     DATASET_DIR,
     TRAIN_DIR,
-    VAL_DIR,
     TEST_DIR,
     SEED,
     CLASS_FOLDER_MAP,
     MAX_IMAGES_PER_CLASS,
 )
 
-TRAIN_RATIO = 0.70
-VAL_RATIO = 0.15
-TEST_RATIO = 0.15
+TRAIN_RATIO = 0.80
+TEST_RATIO = 0.20
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 def limpiar_dataset():
+    """Elimina el dataset procesado y recrea las carpetas train y test."""
     if DATASET_DIR.exists():
         shutil.rmtree(DATASET_DIR)
 
     TRAIN_DIR.mkdir(parents=True, exist_ok=True)
-    VAL_DIR.mkdir(parents=True, exist_ok=True)
     TEST_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def obtener_imagenes(carpeta):
+    """Retorna lista de imágenes válidas dentro de una carpeta."""
     return [
         img for img in carpeta.iterdir()
         if img.is_file() and img.suffix.lower() in IMAGE_EXTENSIONS
@@ -36,8 +46,8 @@ def obtener_imagenes(carpeta):
 
 
 def copiar_split(imagenes, destino):
+    """Copia una lista de imágenes al directorio destino."""
     destino.mkdir(parents=True, exist_ok=True)
-
     for img in imagenes:
         shutil.copy2(img, destino / img.name)
 
@@ -59,13 +69,13 @@ def preparar_dataset():
         origen = DATASET_ORIGINAL_DIR / carpeta_original
 
         if not origen.exists():
-            print(f"⚠️ No se encontró la carpeta: {origen}")
+            print(f"⚠️  No se encontró la carpeta: {origen}")
             continue
 
         imagenes = obtener_imagenes(origen)
 
         if not imagenes:
-            print(f"⚠️ La carpeta {origen} no tiene imágenes válidas.")
+            print(f"⚠️  La carpeta {origen} no tiene imágenes válidas.")
             continue
 
         random.shuffle(imagenes)
@@ -79,33 +89,36 @@ def preparar_dataset():
         total_usado = len(imagenes)
 
         train_end = int(total_usado * TRAIN_RATIO)
-        val_end = train_end + int(total_usado * VAL_RATIO)
 
         train_imgs = imagenes[:train_end]
-        val_imgs = imagenes[train_end:val_end]
-        test_imgs = imagenes[val_end:]
+        test_imgs = imagenes[train_end:]
 
         copiar_split(train_imgs, TRAIN_DIR / clase_limpia)
-        copiar_split(val_imgs, VAL_DIR / clase_limpia)
         copiar_split(test_imgs, TEST_DIR / clase_limpia)
 
         resumen.append((
             clase_limpia,
             len(train_imgs),
-            len(val_imgs),
             len(test_imgs),
             total_usado,
-            total_original
+            total_original,
         ))
 
     print("\n✅ Dataset preparado correctamente\n")
-    print("Clase\t\tTrain\tVal\tTest\tUsadas\tOriginales")
-    print("-" * 75)
+    print(f"{'Clase':<18} {'Train':>6} {'Test':>6} {'Usadas':>8} {'Originales':>10}")
+    print("─" * 52)
 
-    for clase, train, val, test, total_usado, total_original in resumen:
-        print(
-            f"{clase:12}\t{train}\t{val}\t{test}\t{total_usado}\t{total_original}"
-        )
+    for clase, train, test, total_usado, total_original in resumen:
+        print(f"{clase:<18} {train:>6} {test:>6} {total_usado:>8} {total_original:>10}")
+
+    total_train = sum(r[1] for r in resumen)
+    total_test = sum(r[2] for r in resumen)
+    total_usado_global = sum(r[3] for r in resumen)
+
+    print("─" * 52)
+    print(f"{'TOTAL':<18} {total_train:>6} {total_test:>6} {total_usado_global:>8}")
+    print(f"\n📁 Train: {TRAIN_DIR}")
+    print(f"📁 Test:  {TEST_DIR}")
 
 
 if __name__ == "__main__":

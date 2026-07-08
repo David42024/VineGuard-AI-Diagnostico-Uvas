@@ -1,0 +1,2 @@
+modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,tiempo_entrenamiento_s,tiempo_inferencia_ms
+H1 — CNN + SVM,0.8167,0.8167,0.8114,0.8167,0.8124,0.7566,149.49,0.06
