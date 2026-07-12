@@ -29,6 +29,7 @@ from datetime import datetime
 import pandas as pd
 import base64
 from scipy import stats
+from statsmodels.stats.contingency_tables import mcnemar as sm_mcnemar
 from sklearn.metrics import matthews_corrcoef, confusion_matrix
 import tempfile
 try:
@@ -50,19 +51,20 @@ try:
 except ImportError:
     HAS_XLSX = False
 
-# Agregar src/ al path para importar extract_features
+# Agregar src/ al path para importar módulos compartidos
 _SRC_PATH = Path(__file__).resolve().parent / "src"
 if str(_SRC_PATH) not in sys.path:
     sys.path.insert(0, str(_SRC_PATH))
 
+# Importar módulo de predicción compartido
+from predecir_imagen import predecir, cargar_modelo, CLASS_NAMES as PRED_CLASS_NAMES
+
+# Importar extract_features para retrocompatibilidad
 try:
     from extract_features import extract_single_image_features
-    from mantenedor import SVM_SCALER_PATH, KNN_SCALER_PATH
     HAS_EXTRACT = True
 except ImportError:
     HAS_EXTRACT = False
-    SVM_SCALER_PATH = None
-    KNN_SCALER_PATH = None
 
 # ======= CONFIGURACIÓN MULTIIDIOMA =======
 TRANSLATIONS = {
@@ -659,39 +661,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Configuración de los 5 modelos: 3 clásicos + 2 híbridos
-MODELS_CONFIG = {
-    "M1 - SVM": {
-        "type": "classic",
-        "path": "models/svm_model.pkl",
-        "description": "Support Vector Machine (RBF) + características manuales",
-    },
-    "M2 - Random Forest": {
-        "type": "classic",
-        "path": "models/random_forest_model.pkl",
-        "description": "Random Forest (200 árboles) + características manuales",
-    },
-    "M3 - KNN": {
-        "type": "classic",
-        "path": "models/knn_model.pkl",
-        "description": "K-Nearest Neighbors (k=5) + características manuales",
-    },
-    "H1 - CNN + SVM": {
-        "type": "hybrid_cnn_svm",
-        "extractor_path": "models/cnn_feature_extractor.h5",
-        "classifier_path": "models/cnn_svm_model.pkl",
-        "description": "CNN extractor de features + clasificador SVM",
-    },
-    "H2 - Transfer + RF": {
-        "type": "hybrid_transfer_rf",
-        "extractor_path": "models/transfer_feature_extractor.h5",
-        "classifier_path": "models/transfer_random_forest_model.pkl",
-        "description": "MobileNetV2 (ImageNet) + Random Forest",
-    },
+# Configuración de los 5 modelos usando el módulo compartido
+MODEL_KEYS = ["M1", "M2", "M3", "H1", "H2"]
+MODEL_DISPLAY_NAMES = {
+    "M1": "M1 - SVM",
+    "M2": "M2 - Random Forest",
+    "M3": "M3 - KNN",
+    "H1": "H1 - CNN + SVM",
+    "H2": "H2 - Transfer + RF",
 }
-
-# Mantener MODEL_PATHS para compatibilidad con partes del código que lo referencian
-MODEL_PATHS = {k: v.get("path", v.get("extractor_path", "")) for k, v in MODELS_CONFIG.items()}
 
 # Clases de enfermedades (keys en inglés para consistencia)
 DISEASE_CLASSES = ["Black_rot", "Esca", "Healthy", "Leaf_blight"]
@@ -803,6 +781,18 @@ def load_model_ranking():
             best_model_name = f.read().strip()
     return ranking_data, best_model_name
 
+def validar_cross_validation() -> bool:
+    archivo = Path("reports/modelos/cross_validation/cross_validation_resultados.csv")
+    if not archivo.is_file():
+        return False
+    try:
+        df = pd.read_csv(archivo)
+        columnas_requeridas = {"modelo", "accuracy_mean", "accuracy_std"}
+        return not df.empty and columnas_requeridas.issubset(df.columns) and df["accuracy_mean"].notna().any()
+    except Exception:
+        return False
+
+
 def check_pipeline_status():
     checks = {
         "eda": {
@@ -821,13 +811,13 @@ def check_pipeline_status():
             "label_es": "Validación cruzada (5-folds)",
             "label_en": "Cross-validation (5-fold)",
             "label_pt": "Validação cruzada (5-fold)",
-            "files": [Path("reports/modelos/cross_validation_resultados.csv")],
+            "files": [Path("reports/modelos/cross_validation/cross_validation_resultados.csv")],
         },
         "hyperparam": {
             "label_es": "Optimización de hiperparámetros",
             "label_en": "Hyperparameter optimization",
             "label_pt": "Otimização de hiperparâmetros",
-            "files": [Path("reports/modelos/mejores_hiperparametros.csv")],
+            "files": [Path("reports/modelos/tuning/mejores_hiperparametros.csv")],
         },
         "statistical": {
             "label_es": "Validación estadística",
@@ -845,7 +835,10 @@ def check_pipeline_status():
     lang = st.session_state.get("language", "es")
     results = {}
     for key, check in checks.items():
-        done = all(f.exists() for f in check["files"])
+        if key == "crossval":
+            done = validar_cross_validation()
+        else:
+            done = all(f.exists() for f in check["files"])
         label = check.get(f"label_{lang}", check["label_es"])
         results[key] = {"done": done, "label": label}
     return results
@@ -853,9 +846,10 @@ def check_pipeline_status():
 # Inicializar estado de sesión
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
+if 'model_status' not in st.session_state:
+    st.session_state.model_status = {}
 if 'models_loaded' not in st.session_state:
     st.session_state.models_loaded = False
-    st.session_state.models = {}
     st.session_state.current_image = None
     st.session_state.predictions = None
     st.session_state.statistical_analysis = None
@@ -869,7 +863,8 @@ if 'models_loaded' not in st.session_state:
     st.session_state.xlsx_bytes = None
     st.session_state.xlsx_ready = False
 
-# Credenciales de usuario (puedes modificar estas)
+# Solo para demostración local e investigación.
+# En producción, usar st.secrets y contraseñas hasheadas.
 VALID_CREDENTIALS = {
     "admin": "admin123",
     "usuario": "12345"
@@ -898,178 +893,72 @@ if st.sidebar.button(get_text('logout', st.session_state.language)):
     st.session_state.logged_in = False
     st.rerun()
 
-# ─── Carga de modelos ────────────────────────────────────────────────────────
+# ─── Carga de modelos (usando módulo compartido) ───────────────────────────────
 @st.cache_resource
-def load_models():
-    """
-    Carga los 5 modelos:
-      - M1 SVM, M2 RF, M3 KNN  → joblib (.pkl)
-      - H1 CNN+SVM              → TF extractor (.h5) + joblib SVM (.pkl)
-      - H2 Transfer+RF          → TF extractor (.h5) + joblib RF (.pkl)
-    Retorna dict con objetos listos para inferencia.
-    """
-    loaded = {}
-    for name, cfg in MODELS_CONFIG.items():
-        model_type = cfg["type"]
+def load_models() -> dict[str, dict]:
+    """Intenta cargar todos los modelos sin detenerse si uno falla."""
+    resultados: dict[str, dict] = {}
+    for modelo in ["M1", "M2", "M3", "H1", "H2"]:
         try:
-            if model_type == "classic":
-                path = cfg["path"]
-                if os.path.exists(path):
-                    loaded[name] = {"type": model_type, "clf": joblib.load(path)}
-                    print(f"✓ {name} cargado desde {path}")
-                else:
-                    st.warning(f"⚠️ Modelo no encontrado: {path}")
-
-            elif model_type in ("hybrid_cnn_svm", "hybrid_transfer_rf"):
-                ext_path = cfg["extractor_path"]
-                clf_path = cfg["classifier_path"]
-                if os.path.exists(ext_path) and os.path.exists(clf_path):
-                    extractor = tf.keras.models.load_model(ext_path)
-                    clf = joblib.load(clf_path)
-                    loaded[name] = {
-                        "type": model_type,
-                        "extractor": extractor,
-                        "clf": clf,
-                    }
-                    print(f"✓ {name} cargado")
-                else:
-                    missing = [p for p in [ext_path, clf_path] if not os.path.exists(p)]
-                    st.warning(f"⚠️ Archivos no encontrados para {name}: {missing}")
-
-        except Exception as e:
-            st.error(f"Error al cargar {name}: {str(e)}")
-
-    return loaded
+            cargar_modelo(modelo)
+            resultados[modelo] = {"disponible": True, "error": None}
+        except Exception as exc:
+            resultados[modelo] = {"disponible": False, "error": str(exc)}
+    return resultados
 
 
-# ─── Preprocesamiento por tipo de modelo ────────────────────────────────────
-
-def preprocess_for_classic(image, model_name=None):
+# ─── Predicción universal (usando módulo compartido) ───────────────────────────
+def predict_disease(image, model_key, model_display_name):
     """
-    Para modelos clásicos (SVM, RF, KNN):
-    Extrae características manuales con extract_features.py y aplica el scaler
-    CORRESPONDIENTE al modelo (cada uno fue entrenado con su propio scaler,
-    o sin scaler en el caso de Random Forest).
-    Retorna array numpy (1, n_features).
+    Wrapper delgado sobre predecir_imagen.predecir(), pero recibiendo un
+    objeto PIL.Image en memoria (la app sube la imagen sin guardarla en
+    disco). Se guarda en un temporal porque predecir() espera una ruta.
     """
-    if HAS_EXTRACT:
-        if model_name == "M1 - SVM" and SVM_SCALER_PATH is not None:
-            return extract_single_image_features(image, apply_scaler=True, scaler_path=SVM_SCALER_PATH)
-        elif model_name == "M3 - KNN" and KNN_SCALER_PATH is not None:
-            return extract_single_image_features(image, apply_scaler=True, scaler_path=KNN_SCALER_PATH)
-        elif model_name == "M2 - Random Forest":
-            return extract_single_image_features(image, apply_scaler=False)
-        return extract_single_image_features(image, apply_scaler=False)
-    # Fallback sin scikit-image: histograma + estadísticas RGB planas
-    img = image.resize((224, 224))
-    arr = np.array(img, dtype=np.float32)
-    feats = []
-    for c in range(3):
-        ch = arr[:, :, c]
-        feats.extend([ch.mean(), ch.std(), ch.var()])
-        hist, _ = np.histogram(ch, bins=64, range=(0, 256))
-        hist = hist.astype(np.float32)
-        if hist.sum() > 0:
-            hist /= hist.sum()
-        feats.extend(hist.tolist())
-    return np.array(feats, dtype=np.float32).reshape(1, -1)
+    import tempfile
+    import os
+    import time
 
+    # Guardar imagen en temporal
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        image.save(tmp.name, format="JPEG")
+        ruta_temp = tmp.name
 
-def preprocess_for_cnn_extractor(image, target_size=(224, 224)):
-    """
-    Para H1 (CNN extractor): normaliza la imagen a [0, 1].
-    Retorna tensor (1, H, W, 3).
-    """
-    img = image.resize(target_size)
-    arr = np.array(img, dtype=np.float32) / 255.0
-    return np.expand_dims(arr, axis=0)
-
-
-def preprocess_for_transfer_extractor(image, target_size=(224, 224)):
-    """
-    Para H2 (MobileNetV2): aplica preprocess_input de MobileNetV2.
-    Retorna tensor (1, H, W, 3) en rango [-1, 1].
-    """
-    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-    img = image.resize(target_size)
-    arr = np.array(img, dtype=np.float32)
-    arr = preprocess_input(arr)
-    return np.expand_dims(arr, axis=0)
-
-
-# Función legacy para mantener compatibilidad con código existente
-def preprocess_image(image, target_size=(224, 224), model_name=None):
-    """Preprocesa imagen (legacy — redirige al preprocesamiento apropiado)."""
-    return preprocess_for_cnn_extractor(image, target_size)
-
-
-# ─── Predicción universal ────────────────────────────────────────────────────
-def predict_disease(image, model_bundle, model_name):
-    """
-    Realiza predicción con cualquiera de los 5 modelos.
-
-    Parameters
-    ----------
-    image        : PIL.Image
-    model_bundle : dict con claves 'type', 'clf' (y opcionalmente 'extractor')
-    model_name   : str — nombre visible del modelo
-
-    Returns
-    -------
-    dict con predicted_class, confidence, all_predictions, inference_time, etc.
-    """
-    model_type = model_bundle.get("type", "classic")
     start_time = time.time()
+    try:
+        resultado = predecir(ruta_temp, model_key)
+    finally:
+        os.unlink(ruta_temp)
+    inference_time = (time.time() - start_time) * 1000
 
-    if model_type == "classic":
-        # ── M1, M2, M3: características manuales ───────────────────────────
-        feats = preprocess_for_classic(image, model_name)   # (1, n_features)
-        clf = model_bundle["clf"]
-        proba = clf.predict_proba(feats)[0]             # (n_classes,)
+    # Obtener probabilidades
+    proba = resultado["probabilidades"]
 
-    elif model_type == "hybrid_cnn_svm":
-        # ── H1: CNN extractor → SVM ─────────────────────────────────────────
-        img_tensor = preprocess_for_cnn_extractor(image)   # (1, 224, 224, 3)
-        extractor = model_bundle["extractor"]
-        feats = extractor(img_tensor, training=False).numpy()  # (1, 256)
-        clf = model_bundle["clf"]
-        proba = clf.predict_proba(feats)[0]             # (n_classes,)
+    predicted_class = resultado["clase_predicha"]
+    if predicted_class not in DISEASE_CLASSES:
+        raise ValueError(
+            f"El modelo devolvió una clase no reconocida: "
+            f"{predicted_class!r}"
+        )
+    predicted_class_idx = DISEASE_CLASSES.index(predicted_class)
 
-    elif model_type == "hybrid_transfer_rf":
-        # ── H2: MobileNetV2 extractor → RF ─────────────────────────────────
-        img_tensor = preprocess_for_transfer_extractor(image)  # (1, 224, 224, 3)
-        extractor = model_bundle["extractor"]
-        feats = extractor(img_tensor, training=False).numpy()   # (1, 1280)
-        clf = model_bundle["clf"]
-        proba = clf.predict_proba(feats)[0]             # (n_classes,)
-
+    if proba is not None:
+        confidence = float(proba[predicted_class_idx])
+        all_predictions = np.asarray(proba, dtype=np.float64)
     else:
-        raise ValueError(f"Tipo de modelo desconocido: {model_type}")
-
-    inference_time = (time.time() - start_time) * 1000  # ms
-
-    # Asegurar que proba tenga longitud = n_clases
-    n_classes = len(DISEASE_CLASSES)
-    if len(proba) < n_classes:
-        padded = np.zeros(n_classes, dtype=np.float32)
-        clf_classes = model_bundle["clf"].classes_
-        for i, cls_idx in enumerate(clf_classes):
-            if cls_idx < n_classes:
-                padded[cls_idx] = proba[i]
-        proba = padded
-
-    predicted_class_idx = int(np.argmax(proba))
-    predicted_class = DISEASE_CLASSES[predicted_class_idx]
-    confidence = float(proba[predicted_class_idx])
+        confidence = None
+        all_predictions = None
 
     return {
-        'model_name': model_name,
+        'model_name': model_display_name,
         'predicted_class': predicted_class,
         'predicted_class_es': get_disease_names(st.session_state.language)[predicted_class],
         'confidence': confidence,
-        'all_predictions': proba,
+        'all_predictions': all_predictions,
         'inference_time': inference_time,
         'predicted_class_idx': predicted_class_idx,
+        'probabilidades_calibradas': resultado.get(
+            "probabilidades_calibradas", False,
+        ),
     }
 
 # ======= NUEVAS FUNCIONES ESTADÍSTICAS =======
@@ -1081,7 +970,7 @@ def calculate_matthews_coefficient(y_true, y_pred, num_classes):
     try:
         mcc = matthews_corrcoef(y_true, y_pred)
         return mcc
-    except:
+    except Exception:
         # Cálculo manual si hay problemas
         cm = confusion_matrix(y_true, y_pred, labels=range(num_classes))
 
@@ -1104,69 +993,60 @@ def calculate_matthews_coefficient(y_true, y_pred, num_classes):
         mcc = numerator / denominator
         return mcc
 
+ALPHA = 0.05
+
+
 def mcnemar_test_multiclass(y_true, y_pred1, y_pred2):
     """
     Prueba de McNemar para clasificación multiclase
     Compara si dos modelos difieren significativamente en sus predicciones
     """
-    # Crear tabla de contingencia 2x2
-    # (correcto_modelo1, incorrecto_modelo1) vs (correcto_modelo2, incorrecto_modelo2)
-
     correct_1 = (y_true == y_pred1)
     correct_2 = (y_true == y_pred2)
 
-    # Casos donde los modelos difieren
-    model1_correct_model2_wrong = np.sum(correct_1 & ~correct_2)  # b
-    model1_wrong_model2_correct = np.sum(~correct_1 & correct_2)  # c
+    a = int(np.sum(correct_1 & correct_2))
+    b = int(np.sum(correct_1 & ~correct_2))
+    c = int(np.sum(~correct_1 & correct_2))
+    d = int(np.sum(~correct_1 & ~correct_2))
 
-    # Tabla de McNemar
-    # |  Modelo2  |           |
-    # |  C    W   | Modelo1   |
-    # |  a    b   | Correcto  |
-    # |  c    d   | Incorrecto|
+    tabla = [[a, b], [c, d]]
 
-    b = model1_correct_model2_wrong
-    c = model1_wrong_model2_correct
-
-    # Si no hay diferencias, no se puede hacer la prueba
     if b + c == 0:
-        return {
-            'statistic': 0.0,
-            'p_value': 1.0,
-            'b': b,
-            'c': c,
-            'interpretation': 'No hay diferencias entre modelos'
-        }
-
-    # Aplicar corrección de continuidad de Yates
-    if b + c > 25:
-        # Para muestras grandes, usar corrección de continuidad
-        statistic = (abs(b - c) - 0.5) ** 2 / (b + c)
+        statistic = 0.0
+        p_value = 1.0
+    elif b + c <= 25:
+        resultado = sm_mcnemar(tabla, exact=True)
+        statistic = float(resultado.statistic)
+        p_value = float(resultado.pvalue)
     else:
-        # Para muestras pequeñas, usar prueba exacta
-        statistic = (b - c) ** 2 / (b + c)
+        resultado = sm_mcnemar(tabla, exact=False, correction=True)
+        statistic = float(resultado.statistic)
+        p_value = float(resultado.pvalue)
 
-    # Calcular p-valor usando distribución chi-cuadrado con 1 grado de libertad
-    p_value = 1 - stats.chi2.cdf(statistic, df=1)
-
-    # Interpretación
     if p_value < 0.001:
-        interpretation = "Diferencia altamente significativa (p < 0.001)"
+        interpretation = (
+            "Diferencia altamente significativa (p < 0.001)"
+        )
     elif p_value < 0.01:
-        interpretation = "Diferencia muy significativa (p < 0.01)"
-    elif p_value < 0.05:
-        interpretation = "Diferencia significativa (p < 0.05)"
-    elif p_value < 0.1:
-        interpretation = "Diferencia marginalmente significativa (p < 0.1)"
+        interpretation = (
+            "Diferencia muy significativa (p < 0.01)"
+        )
+    elif p_value < ALPHA:
+        interpretation = (
+            "Diferencia significativa (p < 0.05)"
+        )
     else:
-        interpretation = "No hay diferencia significativa (p ≥ 0.1)"
+        interpretation = (
+            "No hay diferencia estadísticamente "
+            "significativa (p ≥ 0.05)"
+        )
 
     return {
         'statistic': statistic,
         'p_value': p_value,
         'b': b,
         'c': c,
-        'interpretation': interpretation
+        'interpretation': interpretation,
     }
 
 def interpret_mcc(mcc):
@@ -1190,15 +1070,31 @@ def interpret_mcc(mcc):
 
 # ======= FUNCIONES PARA VALIDACIÓN CON MÚLTIPLES IMÁGENES =======
 
-def process_multiple_images_by_folders(disease_files, models):
+def get_modelos_disponibles() -> list[str]:
+    model_status = st.session_state.get("model_status", {})
+    return [
+        mk for mk in MODEL_KEYS
+        if model_status.get(mk, {}).get("disponible", False)
+    ]
+
+
+def process_multiple_images_by_folders(disease_files):
     """
     Procesa múltiples imágenes organizadas por carpetas de enfermedades
+    (usando el módulo de predicción compartido). Solo usa modelos disponibles.
     """
-    all_predictions = {model_name: [] for model_name in models.keys()}
+    modelos_a_usar = get_modelos_disponibles()
+    if not modelos_a_usar:
+        return None, (
+            "No hay modelos disponibles. "
+            "Carga los modelos antes de procesar el dataset."
+        )
+    nombres_a_usar = [MODEL_DISPLAY_NAMES[mk] for mk in modelos_a_usar]
+    all_predictions = {dn: [] for dn in nombres_a_usar}
     y_true = []
     total_images = 0
+    errores_modelos = {}
 
-    # Contar total de imágenes
     for disease_name, files in disease_files.items():
         total_images += len(files)
 
@@ -1211,37 +1107,52 @@ def process_multiple_images_by_folders(disease_files, models):
 
         for disease_name, files in disease_files.items():
             if len(files) > 0:
-                # Obtener la clave en inglés de la enfermedad
                 disease_folders = get_disease_folders(st.session_state.language)
                 disease_key = disease_folders[disease_name]["key"]
                 disease_idx = DISEASE_CLASSES.index(disease_key)
 
                 for uploaded_file in files:
-                    # Cargar imagen
                     image = Image.open(uploaded_file).convert('RGB')
-
-                    # Añadir etiqueta verdadera
                     y_true.append(disease_idx)
 
-                    # Obtener predicciones de todos los modelos
-                    for model_name, model in models.items():
-                        result = predict_disease(image, model, model_name)
-                        predicted_idx = result['predicted_class_idx']
-                        all_predictions[model_name].append(predicted_idx)
+                    for model_key in modelos_a_usar:
+                        display_name = MODEL_DISPLAY_NAMES[model_key]
+                        try:
+                            result = predict_disease(image, model_key, display_name)
+                            predicted_idx = result['predicted_class_idx']
+                            all_predictions[display_name].append(predicted_idx)
+                        except Exception as exc:
+                            errores_modelos.setdefault(display_name, str(exc))
 
                     processed += 1
                     progress_bar.progress(processed / total_images)
 
         progress_bar.empty()
 
-        # Convertir a arrays numpy
-        model_predictions = [np.array(all_predictions[model_name]) for model_name in models.keys()]
         y_true = np.array(y_true)
+
+        modelos_completos = [
+            dn for dn in nombres_a_usar
+            if len(all_predictions.get(dn, [])) == len(y_true)
+        ]
+
+        if not modelos_completos:
+            return None, "Ningún modelo completó el procesamiento de todas las imágenes."
+
+        if errores_modelos:
+            st.warning(
+                "Algunos modelos tuvieron errores parciales y fueron excluidos: "
+                + ", ".join(f"{k}: {v}" for k, v in errores_modelos.items())
+            )
+
+        model_predictions = [
+            np.array(all_predictions[dn]) for dn in modelos_completos
+        ]
 
         return {
             'y_true': y_true,
             'predictions': model_predictions,
-            'model_names': list(models.keys())
+            'model_names': modelos_completos,
         }, None
 
     except Exception as e:
@@ -1269,7 +1180,8 @@ def create_validation_results_display(validation_data, mcnemar_analysis):
 
 def perform_mcnemar_analysis(validation_data):
     """
-    Realiza análisis McNemar con datos reales de validación
+    Realiza análisis McNemar con datos reales de validación.
+    Requiere al menos 2 modelos válidos para McNemar.
     """
     if validation_data is None:
         return None
@@ -1278,17 +1190,39 @@ def perform_mcnemar_analysis(validation_data):
     model_predictions = validation_data['predictions']
     model_names = validation_data['model_names']
 
-    # Calcular MCC real para cada modelo
+    if len(model_names) < 2:
+        st.warning(
+            "Se requieren al menos dos modelos disponibles "
+            "para realizar la prueba de McNemar."
+        )
+        matthews_coefficients = []
+        for i, (model_name, predictions) in enumerate(
+            zip(model_names, model_predictions)
+        ):
+            mcc = calculate_matthews_coefficient(
+                y_true_real, predictions, len(DISEASE_CLASSES)
+            )
+            matthews_coefficients.append({
+                'model': model_name,
+                'mcc': mcc,
+                'interpretation': interpret_mcc(mcc),
+            })
+        return {
+            'matthews_coefficients': matthews_coefficients,
+            'mcnemar_results': [],
+            'sample_size': len(y_true_real),
+            'real_data': True,
+        }
+
     matthews_coefficients = []
     for i, (model_name, predictions) in enumerate(zip(model_names, model_predictions)):
         mcc = calculate_matthews_coefficient(y_true_real, predictions, len(DISEASE_CLASSES))
         matthews_coefficients.append({
             'model': model_name,
             'mcc': mcc,
-            'interpretation': interpret_mcc(mcc)
+            'interpretation': interpret_mcc(mcc),
         })
 
-    # Realizar pruebas de McNemar entre todos los pares de modelos
     mcnemar_results = []
     for i in range(len(model_names)):
         for j in range(i + 1, len(model_names)):
@@ -1296,7 +1230,7 @@ def perform_mcnemar_analysis(validation_data):
                 mcnemar_result = mcnemar_test_multiclass(
                     y_true_real,
                     model_predictions[i],
-                    model_predictions[j]
+                    model_predictions[j],
                 )
                 mcnemar_result['model1'] = model_names[i]
                 mcnemar_result['model2'] = model_names[j]
@@ -1306,7 +1240,7 @@ def perform_mcnemar_analysis(validation_data):
         'matthews_coefficients': matthews_coefficients,
         'mcnemar_results': mcnemar_results,
         'sample_size': len(y_true_real),
-        'real_data': True
+        'real_data': True,
     }
 
 def generate_interpretation_for_professor(mcnemar_analysis, validation_data):
@@ -1316,15 +1250,12 @@ def generate_interpretation_for_professor(mcnemar_analysis, validation_data):
     if not mcnemar_analysis:
         return "No hay datos para interpretar."
 
-    # Análisis básico
     sample_size = mcnemar_analysis['sample_size']
     matthews_coefficients = mcnemar_analysis['matthews_coefficients']
     mcnemar_results = mcnemar_analysis['mcnemar_results']
 
-    # Encontrar mejor modelo por MCC
     best_mcc_model = max(matthews_coefficients, key=lambda x: x['mcc'])
 
-    # Encontrar mejor modelo por precisión
     y_true = validation_data['y_true']
     model_predictions = validation_data['predictions']
     model_names = validation_data['model_names']
@@ -1336,10 +1267,8 @@ def generate_interpretation_for_professor(mcnemar_analysis, validation_data):
 
     best_accuracy_model = max(accuracies, key=lambda x: x['accuracy'])
 
-    # Contar diferencias significativas
-    significant_differences = len([r for r in mcnemar_results if r['p_value'] < 0.05])
+    significant_differences = len([r for r in mcnemar_results if r['p_value'] < ALPHA])
 
-    # Generar interpretación
     interpretation = f"""
 **INTERPRETACIÓN PARA PRESENTACIÓN ACADÉMICA**
 
@@ -1349,18 +1278,38 @@ def generate_interpretation_for_professor(mcnemar_analysis, validation_data):
 
 **Análisis Estadístico:**
 • **Coeficiente de Matthews (MCC):** {best_mcc_model['mcc']:.3f} - {best_mcc_model['interpretation']}
-• **Pruebas de McNemar:** {significant_differences} de {len(mcnemar_results)} comparaciones muestran diferencias significativas (p < 0.05)
+• **Pruebas de McNemar:** {significant_differences} de {len(mcnemar_results)} comparaciones muestran diferencias significativas (p < {ALPHA})
 
 **Conclusión Científica:**
 """
 
     if significant_differences > 0:
-        interpretation += f"Existen diferencias estadísticamente significativas entre algunos modelos, validando la necesidad de selección cuidadosa del algoritmo. {best_accuracy_model['model']} muestra el mejor rendimiento general."
+        interpretation += (
+            "Se encontraron diferencias estadísticamente "
+            "significativas entre algunos modelos. "
+            "Esto respalda comparar sus métricas de rendimiento "
+            "antes de seleccionar el modelo para implementación "
+            "en el sistema o en condiciones de campo."
+        )
     else:
-        interpretation += f"No se encontraron diferencias estadísticamente significativas entre modelos (p ≥ 0.05), indicando rendimiento equivalente. Cualquier modelo es válido para implementación clínica."
+        interpretation += (
+            "No se encontraron diferencias estadísticamente "
+            "significativas entre los modelos evaluados. "
+            "Esto no demuestra equivalencia absoluta, ya que "
+            "el resultado también puede estar influido por el "
+            "tamaño de muestra y la potencia estadística. "
+            "La selección final debe considerar precisión, MCC, "
+            "tiempo de inferencia, estabilidad y costo computacional."
+        )
 
-    if best_mcc_model['mcc'] == 0:
-        interpretation += f"\n\n**Nota Metodológica:** MCC = 0 indica dataset homogéneo (una clase predominante), típico en validaciones clínicas enfocadas."
+    if np.isclose(best_mcc_model['mcc'], 0.0, atol=1e-12):
+        interpretation += (
+            "\n\n**Nota metodológica:** Un MCC cercano "
+            "a cero indica poca o ninguna asociación entre "
+            "las predicciones y las etiquetas reales. "
+            "Debe revisarse la distribución de clases, "
+            "la matriz de confusión y el tamaño de muestra."
+        )
 
     return interpretation
 
@@ -1624,7 +1573,19 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             predictions = [r['predicted_class'] for r in results]
             consensus = max(set(predictions), key=predictions.count)
             consensus_count = predictions.count(consensus)
-            consensus_confidence = np.mean([r['confidence'] for r in results if r['predicted_class'] == consensus])
+            confianzas_consenso = [
+                r['confidence']
+                for r in results
+                if (
+                    r['predicted_class'] == consensus
+                    and r.get('confidence') is not None
+                )
+            ]
+            consensus_confidence = (
+                float(np.mean(confianzas_consenso))
+                if confianzas_consenso
+                else None
+            )
 
             # Etiquetas traducidas
             main_diagnosis_label = 'MAIN DIAGNOSIS' if current_language == 'en' else 'DIAGNÓSTICO PRINCIPAL' if current_language == 'pt' else 'DIAGNÓSTICO PRINCIPAL'
@@ -1634,7 +1595,12 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
 
             fig.text(0.1, 0.6, main_diagnosis_label, fontsize=16, fontweight='bold', color='#2E8B57')
             fig.text(0.1, 0.55, f'{disease_label} {get_disease_names(current_language)[consensus]}', fontsize=12)
-            fig.text(0.1, 0.52, f'{confidence_label} {consensus_confidence:.1%}', fontsize=12)
+            confidence_text = (
+                f"{consensus_confidence:.1%}"
+                if consensus_confidence is not None
+                else "No disponible"
+            )
+            fig.text(0.1, 0.52, f'{confidence_label} {confidence_text}', fontsize=12)
             fig.text(0.1, 0.49, f'{consensus_label} {consensus_count}/{len(results)} modelos', fontsize=12)
 
             # Recomendaciones clave
@@ -1663,7 +1629,13 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
 
             # Gráfico 1: Confianza por modelo
             model_names = [r['model_name'] for r in results]
-            confidences = [r['confidence'] for r in results]
+            # 0.0 representa "probabilidad no disponible", no confianza real del 0%
+            confidences = [
+                r['confidence']
+                if r.get('confidence') is not None
+                else 0.0
+                for r in results
+            ]
             colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
 
             bars1 = ax1.bar(range(len(model_names)), confidences, color=colors)
@@ -1677,10 +1649,16 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             ax1.set_xticks(range(len(model_names)))
             ax1.set_xticklabels([name.replace(' ', '\n') for name in model_names], fontsize=9)
 
-            for bar, conf in zip(bars1, confidences):
+            for bar, resultado in zip(bars1, results):
                 height = bar.get_height()
+                conf_orig = resultado.get('confidence')
+                texto_conf = (
+                    f"{conf_orig:.1%}"
+                    if conf_orig is not None
+                    else "N/D"
+                )
                 ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                         f'{conf:.1%}', ha='center', va='bottom', fontweight='bold')
+                         texto_conf, ha='center', va='bottom', fontweight='bold')
 
             # Gráfico 2: Tiempo de inferencia
             inference_times = [r['inference_time'] for r in results]
@@ -1701,19 +1679,50 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                          f'{time:.0f}', ha='center', va='bottom', fontweight='bold')
 
             # Gráfico 3: Distribución de probabilidades
-            best_result = max(results, key=lambda x: x['confidence'])
-            all_probs = best_result['all_predictions']
-            
-            # Usar nombres de enfermedades traducidos
-            disease_names_translated = [get_disease_names(current_language)[cls] for cls in DISEASE_CLASSES]
+            resultados_con_prob = [
+                r for r in results
+                if r.get("confidence") is not None
+                and r.get("all_predictions") is not None
+            ]
+            best_result = (
+                max(
+                    resultados_con_prob,
+                    key=lambda r: r["confidence"],
+                )
+                if resultados_con_prob
+                else None
+            )
 
-            wedges, texts, autotexts = ax3.pie(all_probs, labels=disease_names_translated,
-                                               autopct='%1.1f%%', startangle=90,
-                                               colors=['#FFB6C1', '#98FB98', '#87CEEB', '#DDA0DD'])
-            
-            # Título traducido
-            probabilities_title = f'Probabilities\n({best_result["model_name"]})' if current_language == 'en' else f'Probabilidades\n({best_result["model_name"]})' if current_language == 'pt' else f'Probabilidades\n({best_result["model_name"]})'
-            ax3.set_title(probabilities_title)
+            if best_result is not None:
+                all_probs = best_result['all_predictions']
+                disease_names_translated = [
+                    get_disease_names(current_language)[cls]
+                    for cls in DISEASE_CLASSES
+                ]
+                wedges, texts, autotexts = ax3.pie(
+                    all_probs, labels=disease_names_translated,
+                    autopct='%1.1f%%', startangle=90,
+                    colors=['#FFB6C1', '#98FB98', '#87CEEB', '#DDA0DD'],
+                )
+                probabilities_title = (
+                    f'Probabilities\n({best_result["model_name"]})'
+                    if current_language == 'en'
+                    else f'Probabilidades\n({best_result["model_name"]})'
+                )
+                ax3.set_title(probabilities_title)
+            else:
+                ax3.text(
+                    0.5, 0.5,
+                    "Probabilidades no disponibles",
+                    ha="center", va="center",
+                )
+                ax3.axis("off")
+
+            modelo_referencia = (
+                best_result
+                if best_result is not None
+                else results[0]
+            )
 
             # Gráfico 4: Consenso entre modelos
             consensus_data = {}
@@ -1759,7 +1768,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                 "H1 - CNN + SVM": "confusion_h1_cnn_svm.csv",
                 "H2 - Transfer + RF": "confusion_h2_transfer_rf.csv",  # nombre debe coincidir EXACTO con MODELS_CONFIG
             }
-            cm_filename = cm_csv_map.get(best_result["model_name"])
+            cm_filename = cm_csv_map.get(modelo_referencia["model_name"])
             cm_path = Path("reports/modelos") / cm_filename if cm_filename else None
             cm_is_real = cm_path is not None and cm_path.is_file()
             if cm_is_real:
@@ -1769,7 +1778,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
 
             im = ax_matrix.imshow(confusion_matrix_data, interpolation='nearest', cmap='Blues')
             
-            confusion_matrix_title = f'Confusion Matrix - {best_result["model_name"]}' if current_language == 'en' else f'Matriz de Confusão - {best_result["model_name"]}' if current_language == 'pt' else f'Matriz de Confusión - {best_result["model_name"]}'
+            confusion_matrix_title = f'Confusion Matrix - {modelo_referencia["model_name"]}' if current_language == 'en' else f'Matriz de Confusão - {modelo_referencia["model_name"]}' if current_language == 'pt' else f'Matriz de Confusión - {modelo_referencia["model_name"]}'
             if not cm_is_real:
                 no_data_note = ' (sin datos de test disponibles)' if current_language != 'en' else ' (test data not available)'
                 confusion_matrix_title += no_data_note
@@ -1926,7 +1935,12 @@ def generate_diagnosis_docx(image, results, consensus_disease):
         row_cells = table.add_row().cells
         row_cells[0].text = result['model_name']
         row_cells[1].text = get_disease_names(current_language)[result['predicted_class']]
-        row_cells[2].text = f'{result["confidence"]:.1%}'
+        confidence_text = (
+            f'{result["confidence"]:.1%}'
+            if result.get("confidence") is not None
+            else "N/D"
+        )
+        row_cells[2].text = confidence_text
         row_cells[3].text = f'{result["inference_time"]:.0f}'
     
     # Recomendaciones
@@ -2006,7 +2020,12 @@ def generate_diagnosis_xlsx(image, results, consensus_disease):
     for row_num, result in enumerate(results, 8):
         ws.cell(row=row_num, column=1, value=result['model_name'])
         ws.cell(row=row_num, column=2, value=get_disease_names(current_language)[result['predicted_class']])
-        ws.cell(row=row_num, column=3, value=f'{result["confidence"]:.1%}')
+        confidence_text = (
+            f'{result["confidence"]:.1%}'
+            if result.get("confidence") is not None
+            else "N/D"
+        )
+        ws.cell(row=row_num, column=3, value=confidence_text)
         ws.cell(row=row_num, column=4, value=f'{result["inference_time"]:.0f}')
     
     # Ajustar ancho de columnas
@@ -2017,7 +2036,7 @@ def generate_diagnosis_xlsx(image, results, consensus_disease):
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
-            except:
+            except Exception:
                 pass
         adjusted_width = (max_length + 2)
         ws.column_dimensions[column].width = adjusted_width
@@ -2051,9 +2070,12 @@ def main():
             if st.button(get_text('load_models', st.session_state.language), type="primary"):
                 loading_msg = 'Cargando modelos...' if st.session_state.language == 'es' else 'Loading models...' if st.session_state.language == 'en' else 'Carregando modelos...'
                 with st.spinner(loading_msg):
-                    st.session_state.models = load_models()
-                    if st.session_state.models:
-                        st.session_state.models_loaded = True
+                    estado_modelos = load_models()
+                    st.session_state.model_status = estado_modelos
+                    st.session_state.models_loaded = any(
+                        e["disponible"] for e in estado_modelos.values()
+                    )
+                    if st.session_state.models_loaded:
                         success_msg = "✅ Modelos cargados exitosamente!" if st.session_state.language == 'es' else "✅ Models loaded successfully!" if st.session_state.language == 'en' else "✅ Modelos carregados com sucesso!"
                         st.success(success_msg)
                     else:
@@ -2061,6 +2083,12 @@ def main():
                         st.error(error_msg)
         else:
             st.success(get_text('models_ready', st.session_state.language))
+            if st.session_state.model_status:
+                for modelo, estado in st.session_state.model_status.items():
+                    if estado["disponible"]:
+                        st.success(f"{modelo}: disponible")
+                    else:
+                        st.warning(f"{modelo}: no disponible — {estado.get('error', 'error desconocido')}")
 
         # ── Panel de Sistema ──────────────────────────────────────────────
         lang = st.session_state.language
@@ -2069,7 +2097,7 @@ def main():
         status_class = "loaded" if st.session_state.models_loaded else "not-loaded"
         status_text = t("Cargados", "Loaded", "Carregados") if st.session_state.models_loaded else t("No cargados", "Not loaded", "Não carregados")
 
-        models_list_html = "".join([f"<li>{name}</li>" for name in MODEL_PATHS.keys()])
+        models_list_html = "".join([f"<li>{name}</li>" for name in MODEL_DISPLAY_NAMES.values()])
         classes_list_html = "".join([f"<li>{get_disease_names(st.session_state.language)[cls]}</li>" for cls in DISEASE_CLASSES])
 
         # ── Mejor modelo ──────────────────────────────────────────────────
@@ -2329,10 +2357,17 @@ def main():
                 # Botón de análisis
                 if st.button(get_text('analyze_image', st.session_state.language), type="primary"):
                     with st.spinner(get_text('analyzing', st.session_state.language)):
-                        # Realizar predicciones con todos los modelos
+                        modelos_disponibles = get_modelos_disponibles()
+                        if not modelos_disponibles:
+                            st.error(
+                                "No hay modelos disponibles. "
+                                "Carga los modelos antes de analizar."
+                            )
+                            st.stop()
                         results = []
-                        for model_name, model in st.session_state.models.items():
-                            result = predict_disease(image, model, model_name)
+                        for model_key in modelos_disponibles:
+                            display_name = MODEL_DISPLAY_NAMES[model_key]
+                            result = predict_disease(image, model_key, display_name)
                             results.append(result)
 
                         st.session_state.predictions = results
@@ -2341,21 +2376,40 @@ def main():
 
                 # Mostrar resultados si existen
                 if st.session_state.predictions:
+                    results = st.session_state.predictions
+
+                    if len(results) == 0:
+                        st.error(
+                            "No se pudo obtener una predicción "
+                            "con ningún modelo disponible."
+                        )
+                        st.stop()
+
                     st.success(get_text('analysis_completed', st.session_state.language))
+
+                    if len(results) == 1:
+                        st.warning(
+                            "Solo un modelo produjo una predicción. "
+                            "No es posible calcular consenso robusto."
+                        )
 
                     # Mostrar resultados por modelo
                     st.subheader(get_text('diagnosis_results', st.session_state.language))
 
                     # Crear columnas para cada modelo
-                    cols = st.columns(len(st.session_state.predictions))
+                    cols = st.columns(len(results))
 
-                    for i, result in enumerate(st.session_state.predictions):
+                    for i, result in enumerate(results):
                         with cols[i]:
-                            # Métrica principal
+                            confidence_delta = (
+                                f"{result['confidence']:.1%} {get_text('confidence', st.session_state.language)}"
+                                if result.get('confidence') is not None
+                                else f"N/D {get_text('confidence', st.session_state.language)}"
+                            )
                             st.metric(
                                 label=result['model_name'],
                                 value=result['predicted_class_es'],
-                                delta=f"{result['confidence']:.1%} {get_text('confidence', st.session_state.language)}"
+                                delta=confidence_delta,
                             )
                             st.caption(f"⏱️ {result['inference_time']:.1f} ms")
 
@@ -2363,15 +2417,23 @@ def main():
                     st.subheader(get_text('consensus_diagnosis', st.session_state.language))
 
                     # Calcular diagnóstico más frecuente
-                    predictions = [r['predicted_class'] for r in st.session_state.predictions]
+                    predictions = [r['predicted_class'] for r in results]
                     consensus = max(set(predictions), key=predictions.count)
                     consensus_count = predictions.count(consensus)
 
-                    # Calcular confianza promedio para el consenso
-                    consensus_confidence = np.mean([
-                        r['confidence'] for r in st.session_state.predictions
-                        if r['predicted_class'] == consensus
-                    ])
+                    confianzas_consenso = [
+                        r['confidence']
+                        for r in results
+                        if (
+                            r['predicted_class'] == consensus
+                            and r.get('confidence') is not None
+                        )
+                    ]
+                    consensus_confidence = (
+                        float(np.mean(confianzas_consenso))
+                        if confianzas_consenso
+                        else None
+                    )
 
                     # Mostrar consenso
                     col1, col2, col3 = st.columns([2, 1, 1])
@@ -2380,31 +2442,54 @@ def main():
                     with col2:
                         st.metric(get_text('coincidence', st.session_state.language), f"{consensus_count}/{len(predictions)}")
                     with col3:
-                        st.metric(get_text('confidence', st.session_state.language).title(), f"{consensus_confidence:.1%}")
+                        confidence_text = (
+                            f"{consensus_confidence:.1%}"
+                            if consensus_confidence is not None
+                            else "No disponible"
+                        )
+                        st.metric(get_text('confidence', st.session_state.language).title(), confidence_text)
 
                     # Gráfico de probabilidades
                     st.subheader(get_text('probability_distribution', st.session_state.language))
 
-                    # Preparar datos para el gráfico
-                    fig, axes = plt.subplots(1, len(st.session_state.predictions),
-                                             figsize=(12, 4))
-                    if len(st.session_state.predictions) == 1:
-                        axes = [axes]
+                    resultados_con_prob = [
+                        r for r in results
+                        if r.get("all_predictions") is not None
+                    ]
 
-                    for i, (ax, result) in enumerate(zip(axes, st.session_state.predictions)):
-                        probs = result['all_predictions']
-                        ax.barh(DISEASE_CLASSES, probs, color=['#e74c3c', '#f39c12', '#27ae60', '#3498db'])
-                        ax.set_xlim(0, 1)
-                        ax.set_title(result['model_name'])
-                        ax.set_xlabel('Probabilidad')
+                    if resultados_con_prob:
+                        fig, axes = plt.subplots(
+                            1, len(resultados_con_prob),
+                            figsize=(12, 4),
+                        )
+                        if len(resultados_con_prob) == 1:
+                            axes = [axes]
 
-                        # Añadir valores en las barras
-                        for j, (clase, prob) in enumerate(zip(DISEASE_CLASSES, probs)):
-                            ax.text(prob + 0.02, j, f'{prob:.1%}',
-                                    va='center', fontsize=9)
+                        for ax, result in zip(axes, resultados_con_prob):
+                            probs = result['all_predictions']
+                            ax.barh(
+                                DISEASE_CLASSES, probs,
+                                color=['#e74c3c', '#f39c12', '#27ae60', '#3498db'],
+                            )
+                            ax.set_xlim(0, 1)
+                            ax.set_title(result['model_name'])
+                            ax.set_xlabel('Probabilidad')
 
-                    plt.tight_layout()
-                    st.pyplot(fig)
+                            for j, (clase, prob) in enumerate(
+                                zip(DISEASE_CLASSES, probs)
+                            ):
+                                ax.text(
+                                    prob + 0.02, j, f'{prob:.1%}',
+                                    va='center', fontsize=9,
+                                )
+
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                    else:
+                        st.info(
+                            "No hay distribuciones de probabilidad "
+                            "disponibles para los modelos ejecutados."
+                        )
 
                     # Recomendaciones
                     st.subheader(get_text('treatment_recommendations', st.session_state.language))
@@ -2890,7 +2975,7 @@ def main():
 
                             # Procesar imágenes por carpetas
                             validation_data, error = process_multiple_images_by_folders(
-                                disease_files, st.session_state.models
+                                disease_files
                             )
 
                             if error:
@@ -2966,38 +3051,49 @@ def main():
                                 # ====== RESULTADOS DE MCNEMAR COMPACTOS ======
                                 st.subheader("🔬 Resultados de la Prueba de McNemar")
 
-                                # Resumen ejecutivo de McNemar
-                                significant_count = len([r for r in mcnemar_analysis['mcnemar_results'] if r['p_value'] < 0.05])
+                                mcnemar_results_list = mcnemar_analysis.get('mcnemar_results', [])
 
-                                if significant_count > 0:
-                                    st.warning(f"⚠️ **{significant_count} de {len(mcnemar_analysis['mcnemar_results'])} comparaciones muestran diferencias significativas**")
+                                if len(mcnemar_results_list) == 0:
+                                    st.info(
+                                        "No hay suficientes modelos disponibles "
+                                        "(se requieren al menos 2) para realizar "
+                                        "comparaciones pareadas de McNemar."
+                                    )
                                 else:
-                                    st.success(f"✅ **Ninguna diferencia significativa encontrada** entre los {len(mcnemar_analysis['mcnemar_results'])} pares de modelos")
+                                    # Resumen ejecutivo de McNemar
+                                    significant_count = len([
+                                        r for r in mcnemar_results_list
+                                        if r['p_value'] < ALPHA
+                                    ])
 
-                                # Mostrar comparaciones en formato compacto
-                                for mcnemar_result in mcnemar_analysis['mcnemar_results']:
-                                    col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
+                                    if significant_count > 0:
+                                        st.warning(
+                                            f"⚠️ **{significant_count} de "
+                                            f"{len(mcnemar_results_list)} "
+                                            f"comparaciones muestran diferencias "
+                                            f"significativas**"
+                                        )
+                                    else:
+                                        st.success(
+                                            f"✅ **Ninguna diferencia significativa "
+                                            f"encontrada** entre los "
+                                            f"{len(mcnemar_results_list)} pares "
+                                            f"de modelos"
+                                        )
 
-                                    with col1:
-                                        st.write(f"**{mcnemar_result['model1']}** vs **{mcnemar_result['model2']}**")
-                                    with col2:
-                                        st.metric("χ²", f"{mcnemar_result['statistic']:.3f}")
-                                    with col3:
-                                        st.metric("p-valor", f"{mcnemar_result['p_value']:.4f}")
-                                    with col4:
-                                        if mcnemar_result['p_value'] < 0.05:
-                                            st.error("**Significativo**")
-                                        else:
-                                            st.success("**No significativo**")
-
-                                # ====== INTERPRETACIÓN PARA EL PROFESOR ======
-                                interpretation = generate_interpretation_for_professor(mcnemar_analysis, validation_data)
-
-                                st.markdown("""
-                                <div class="interpretation-box">
-                                {}
-                                </div>
-                                """.format(interpretation.replace('\n', '<br>')), unsafe_allow_html=True)
+                                    for mcnemar_result in mcnemar_results_list:
+                                        c1, c2, c3, c4 = st.columns([2, 1, 1, 2])
+                                        with c1:
+                                            st.write(f"**{mcnemar_result['model1']}** vs **{mcnemar_result['model2']}**")
+                                        with c2:
+                                            st.metric("χ²", f"{mcnemar_result['statistic']:.3f}")
+                                        with c3:
+                                            st.metric("p-valor", f"{mcnemar_result['p_value']:.4f}")
+                                        with c4:
+                                            if mcnemar_result['p_value'] < ALPHA:
+                                                st.error("**Significativo**")
+                                            else:
+                                                st.success("**No significativo**")
 
                                 # ====== ENLACE A ANÁLISIS COMPLETO ======
                                 st.info("""

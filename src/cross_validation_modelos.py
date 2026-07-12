@@ -1,150 +1,550 @@
 """
 cross_validation_modelos.py
-Validación cruzada con StratifiedKFold (5 folds) para todos los modelos.
-Reporta accuracy, F1-score y MCC promedio con su desviación estándar.
+
+Validación cruzada estratificada de 5 folds para:
+- M1: SVM
+- M2: Random Forest
+- M3: KNN
+
+El conjunto test se mantiene completamente aislado.
+La validación cruzada utiliza únicamente las imágenes reales
+del conjunto de entrenamiento, sin aumento previo a los folds.
 """
 
+import io
 import sys
+import time
 import warnings
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
-from sklearn.model_selection import StratifiedKFold
-from sklearn.svm import SVC
+import numpy as np
+import pandas as pd
+
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+)
+from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+elif hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer,
+        encoding="utf-8",
+    )
+
 
 warnings.filterwarnings("ignore")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mantenedor import MODELOS_DIR, CLASS_NAMES, SEED
+SRC_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SRC_DIR))
+
+from mantenedor import (
+    COMPARATIVOS_DIR,
+    CROSS_VALIDATION_DIR,
+    CROSS_VALIDATION_RESULTADOS_PATH,
+    SEED,
+)
 from extract_features import load_features
 
-import sys
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-elif hasattr(sys.stdout, 'buffer'):
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 N_FOLDS = 5
-MODELOS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def cv_modelo(modelo, nombre, X, y):
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
-    accs, f1s, mccs = [], [], []
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
-        X_tr, X_val = X[train_idx], X[val_idx]
-        y_tr, y_val = y[train_idx], y[val_idx]
-        clf = modelo
-        clf.fit(X_tr, y_tr)
-        y_pred = clf.predict(X_val)
-        accs.append(accuracy_score(y_val, y_pred))
-        f1s.append(f1_score(y_val, y_pred, average="weighted", zero_division=0))
-        mccs.append(matthews_corrcoef(y_val, y_pred))
-        print(f"    Fold {fold}/{N_FOLDS} — Acc: {accs[-1]:.4f}, F1: {f1s[-1]:.4f}, MCC: {mccs[-1]:.4f}")
-    return {
+def ejecutar_cv(
+    modelo,
+    nombre: str,
+    X: np.ndarray,
+    y: np.ndarray,
+) -> tuple[dict, list[dict]]:
+    """
+    Ejecuta StratifiedKFold y devuelve:
+    - resumen del modelo;
+    - resultados individuales de cada fold.
+    """
+    skf = StratifiedKFold(
+        n_splits=N_FOLDS,
+        shuffle=True,
+        random_state=SEED,
+    )
+
+    resultados_folds = []
+
+    print(f"\n🔹 {nombre}")
+
+    for fold, (train_idx, val_idx) in enumerate(
+        skf.split(X, y),
+        start=1,
+    ):
+        X_train_fold = X[train_idx]
+        X_val_fold = X[val_idx]
+
+        y_train_fold = y[train_idx]
+        y_val_fold = y[val_idx]
+
+        # Modelo independiente en cada fold
+        clasificador = clone(modelo)
+
+        inicio_entrenamiento = time.perf_counter()
+
+        clasificador.fit(
+            X_train_fold,
+            y_train_fold,
+        )
+
+        tiempo_entrenamiento = (
+            time.perf_counter()
+            - inicio_entrenamiento
+        )
+
+        inicio_inferencia = time.perf_counter()
+
+        y_pred = clasificador.predict(
+            X_val_fold
+        )
+
+        tiempo_inferencia = (
+            time.perf_counter()
+            - inicio_inferencia
+        )
+
+        resultado_fold = {
+            "modelo": nombre,
+            "fold": fold,
+            "n_train": len(train_idx),
+            "n_validacion": len(val_idx),
+
+            "accuracy": accuracy_score(
+                y_val_fold,
+                y_pred,
+            ),
+
+            "balanced_accuracy": balanced_accuracy_score(
+                y_val_fold,
+                y_pred,
+            ),
+
+            "precision_weighted": precision_score(
+                y_val_fold,
+                y_pred,
+                average="weighted",
+                zero_division=0,
+            ),
+
+            "recall_weighted": recall_score(
+                y_val_fold,
+                y_pred,
+                average="weighted",
+                zero_division=0,
+            ),
+
+            "f1_weighted": f1_score(
+                y_val_fold,
+                y_pred,
+                average="weighted",
+                zero_division=0,
+            ),
+
+            "mcc": matthews_corrcoef(
+                y_val_fold,
+                y_pred,
+            ),
+
+            "tiempo_entrenamiento_s": (
+                tiempo_entrenamiento
+            ),
+
+            "tiempo_inferencia_total_s": (
+                tiempo_inferencia
+            ),
+
+            "tiempo_inferencia_ms_muestra": (
+                tiempo_inferencia
+                / len(y_pred)
+            ) * 1000,
+        }
+
+        resultados_folds.append(
+            resultado_fold
+        )
+
+        print(
+            f"   Fold {fold}/{N_FOLDS} — "
+            f"Acc: {resultado_fold['accuracy']:.4f}, "
+            f"Bal. Acc: "
+            f"{resultado_fold['balanced_accuracy']:.4f}, "
+            f"F1: {resultado_fold['f1_weighted']:.4f}, "
+            f"MCC: {resultado_fold['mcc']:.4f}"
+        )
+
+    df_folds = pd.DataFrame(
+        resultados_folds
+    )
+
+    resumen = {
         "modelo": nombre,
-        "accuracy_mean": round(np.mean(accs), 4),
-        "accuracy_std": round(np.std(accs), 4),
-        "f1_mean": round(np.mean(f1s), 4),
-        "f1_std": round(np.std(f1s), 4),
-        "mcc_mean": round(np.mean(mccs), 4),
-        "mcc_std": round(np.std(mccs), 4),
-        "accuracies": accs,
-        "f1_scores": f1s,
-        "mcc_scores": mccs,
+        "n_folds": N_FOLDS,
+
+        "accuracy_mean": df_folds[
+            "accuracy"
+        ].mean(),
+        "accuracy_std": df_folds[
+            "accuracy"
+        ].std(ddof=1),
+
+        "balanced_accuracy_mean": df_folds[
+            "balanced_accuracy"
+        ].mean(),
+        "balanced_accuracy_std": df_folds[
+            "balanced_accuracy"
+        ].std(ddof=1),
+
+        "precision_mean": df_folds[
+            "precision_weighted"
+        ].mean(),
+        "precision_std": df_folds[
+            "precision_weighted"
+        ].std(ddof=1),
+
+        "recall_mean": df_folds[
+            "recall_weighted"
+        ].mean(),
+        "recall_std": df_folds[
+            "recall_weighted"
+        ].std(ddof=1),
+
+        "f1_mean": df_folds[
+            "f1_weighted"
+        ].mean(),
+        "f1_std": df_folds[
+            "f1_weighted"
+        ].std(ddof=1),
+
+        "mcc_mean": df_folds[
+            "mcc"
+        ].mean(),
+        "mcc_std": df_folds[
+            "mcc"
+        ].std(ddof=1),
+
+        "tiempo_entrenamiento_mean_s": df_folds[
+            "tiempo_entrenamiento_s"
+        ].mean(),
+
+        "tiempo_inferencia_mean_ms": df_folds[
+            "tiempo_inferencia_ms_muestra"
+        ].mean(),
     }
 
+    return resumen, resultados_folds
 
-def main():
+
+def guardar_grafico(
+    df_resumen: pd.DataFrame,
+) -> None:
+    """
+    Guarda la comparación de accuracy promedio.
+    """
+    modelos = df_resumen[
+        "modelo"
+    ].tolist()
+
+    medias = df_resumen[
+        "accuracy_mean"
+    ].to_numpy()
+
+    desviaciones = df_resumen[
+        "accuracy_std"
+    ].to_numpy()
+
+    figura, eje = plt.subplots(
+        figsize=(10, 5)
+    )
+
+    barras = eje.bar(
+        modelos,
+        medias,
+        yerr=desviaciones,
+        capsize=5,
+    )
+
+    eje.set_ylabel(
+        "Accuracy promedio"
+    )
+
+    eje.set_title(
+        "Validación cruzada estratificada de 5 folds"
+    )
+
+    eje.set_ylim(
+        0,
+        1,
+    )
+
+    for barra, media in zip(
+        barras,
+        medias,
+    ):
+        eje.text(
+            barra.get_x()
+            + barra.get_width() / 2,
+            media + 0.015,
+            f"{media:.4f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    plt.xticks(
+        rotation=15
+    )
+
+    plt.tight_layout()
+
+    figura.savefig(
+        CROSS_VALIDATION_DIR
+        / "cross_validation_comparacion.png",
+        dpi=200,
+        bbox_inches="tight",
+    )
+
+    plt.close(
+        figura
+    )
+
+
+def main() -> None:
     print("=" * 60)
     print("  VALIDACIÓN CRUZADA — VineGuard AI")
     print("=" * 60)
-    print(f"\n  StratifiedKFold con {N_FOLDS} folds\n")
 
-    resultados = []
+    print(
+        f"\n  StratifiedKFold con "
+        f"{N_FOLDS} folds"
+    )
 
-    # Modelos clásicos
-    print("🔹 M1 — SVM (RBF)")
-    X_train, y_train, X_test, y_test = load_features(fit_scaler=False)
-    X = np.concatenate([X_train, X_test], axis=0)
-    y = np.concatenate([y_train, y_test], axis=0)
-    print(f"  Total muestras: {len(y)}")
-    svm = SVC(kernel="rbf", C=10.0, gamma="scale", probability=True, class_weight="balanced", random_state=SEED)
-    res = cv_modelo(svm, "M1 - SVM", X, y)
-    resultados.append(res)
+    print(
+        "  Se utiliza únicamente el train original."
+    )
 
-    print("\n🔹 M2 — Random Forest")
-    rf = RandomForestClassifier(n_estimators=200, max_depth=None, class_weight="balanced", n_jobs=-1, random_state=SEED)
-    res = cv_modelo(rf, "M2 - Random Forest", X, y)
-    resultados.append(res)
+    print(
+        "  El conjunto test permanece aislado."
+    )
 
-    print("\n🔹 M3 — KNN")
-    knn = KNeighborsClassifier(n_neighbors=5, metric="euclidean", weights="distance", n_jobs=-1)
-    res = cv_modelo(knn, "M3 - KNN", X, y)
-    resultados.append(res)
+    print(
+        "  No se aplica aumento antes de crear los folds.\n"
+    )
 
-    print("\n🔹 H1 — CNN + SVM")
-    print("  (requiere features extraídas por CNN; se omitirá si no existen)")
-    print("  ⚠️  Cross-validation para H1 requiere re-entrenar CNN en cada fold.")
-    print("  Por simplicidad, se reporta solo la evaluación sobre test existente.\n")
-    resultados.append({
-        "modelo": "H1 - CNN+SVM", "accuracy_mean": None, "accuracy_std": None,
-        "f1_mean": None, "f1_std": None, "mcc_mean": None, "mcc_std": None,
-        "accuracies": [], "f1_scores": [], "mcc_scores": [],
-    })
+    COMPARATIVOS_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    print("🔹 H2 — Transfer Learning + RF")
-    print("  ⚠️  Requiere extraer embeddings MobileNetV2 en cada fold.")
-    print("  Por simplicidad, se reporta solo la evaluación sobre test existente.\n")
-    resultados.append({
-        "modelo": "H2 - MobileNetV2+RF", "accuracy_mean": None, "accuracy_std": None,
-        "f1_mean": None, "f1_std": None, "mcc_mean": None, "mcc_std": None,
-        "accuracies": [], "f1_scores": [], "mcc_scores": [],
-    })
+    CROSS_VALIDATION_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    df_resultados = pd.DataFrame([{
-        "modelo": r["modelo"],
-        "accuracy_mean": r["accuracy_mean"],
-        "accuracy_std": r["accuracy_std"],
-        "f1_mean": r["f1_mean"],
-        "f1_std": r["f1_std"],
-        "mcc_mean": r["mcc_mean"],
-        "mcc_std": r["mcc_std"],
-    } for r in resultados])
+    # Importante:
+    # características reales de train, sin aumento
+    # y sin escalado global.
+    (
+        X_train,
+        y_train,
+        _,
+        _,
+        _,
+    ) = load_features(
+        fit_scaler=False,
+        augment_train=False,
+        apply_scaler=False,
+    )
 
-    df_resultados.to_csv(MODELOS_DIR / "cross_validation_resultados.csv", index=False)
-    print(f"\n✅ Resultados guardados en: {MODELOS_DIR / 'cross_validation_resultados.csv'}")
+    X = np.asarray(
+        X_train,
+        dtype=np.float32,
+    )
+
+    y = np.asarray(
+        y_train,
+        dtype=np.int32,
+    )
+
+    print(
+        f"  Muestras utilizadas: {len(y)}"
+    )
+
+    print(
+        f"  Características: {X.shape[1]}"
+    )
+
+    modelos = [
+        (
+            "M1 — SVM",
+            Pipeline([
+                (
+                    "scaler",
+                    StandardScaler(),
+                ),
+                (
+                    "modelo",
+                    SVC(
+                        kernel="rbf",
+                        C=10.0,
+                        gamma="scale",
+                        probability=False,
+                        class_weight="balanced",
+                        random_state=SEED,
+                    ),
+                ),
+            ]),
+        ),
+        (
+            "M2 — Random Forest",
+            RandomForestClassifier(
+                n_estimators=200,
+                max_depth=None,
+                min_samples_split=2,
+                min_samples_leaf=1,
+                class_weight=None,
+                n_jobs=-1,
+                random_state=SEED,
+            ),
+        ),
+        (
+            "M3 — KNN",
+            Pipeline([
+                (
+                    "scaler",
+                    StandardScaler(),
+                ),
+                (
+                    "modelo",
+                    KNeighborsClassifier(
+                        n_neighbors=5,
+                        metric="euclidean",
+                        weights="distance",
+                        algorithm="auto",
+                        n_jobs=-1,
+                    ),
+                ),
+            ]),
+        ),
+    ]
+
+    resumenes = []
+    todos_los_folds = []
+
+    for nombre, modelo in modelos:
+        resumen, resultados_folds = ejecutar_cv(
+            modelo,
+            nombre,
+            X,
+            y,
+        )
+
+        resumenes.append(
+            resumen
+        )
+
+        todos_los_folds.extend(
+            resultados_folds
+        )
+
+    df_resumen = pd.DataFrame(
+        resumenes
+    )
+
+    columnas_numericas = df_resumen.select_dtypes(
+        include=[np.number]
+    ).columns
+
+    df_resumen[
+        columnas_numericas
+    ] = df_resumen[
+        columnas_numericas
+    ].round(4)
+
+    df_folds = pd.DataFrame(
+        todos_los_folds
+    )
+
+    columnas_folds = df_folds.select_dtypes(
+        include=[np.number]
+    ).columns
+
+    df_folds[
+        columnas_folds
+    ] = df_folds[
+        columnas_folds
+    ].round(4)
+
+    ruta_resumen = CROSS_VALIDATION_RESULTADOS_PATH
+
+    ruta_folds = (
+        CROSS_VALIDATION_DIR
+        / "cross_validation_por_fold.csv"
+    )
+
+    df_resumen.to_csv(
+        ruta_resumen,
+        index=False,
+    )
+
+    df_folds.to_csv(
+        ruta_folds,
+        index=False,
+    )
+
+    guardar_grafico(
+        df_resumen
+    )
 
     print("\n" + "=" * 60)
     print("  RESUMEN CROSS-VALIDATION")
     print("=" * 60)
-    print(df_resultados.to_string(index=False))
 
-    modelos = [r["modelo"] for r in resultados]
-    acc_means = [r["accuracy_mean"] if r["accuracy_mean"] is not None else 0 for r in resultados]
-    acc_stds = [r["accuracy_std"] if r["accuracy_std"] is not None else 0 for r in resultados]
+    print(
+        df_resumen.to_string(
+            index=False
+        )
+    )
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bars = ax.bar(modelos, acc_means, yerr=acc_stds, capsize=5, color=["#3498db", "#2ecc71", "#e74c3c", "#f39c12", "#9b59b6"])
-    ax.set_ylabel("Accuracy promedio")
-    ax.set_title("Comparación de modelos — Cross-Validation (StratifiedKFold)")
-    ax.set_ylim(0, 1)
-    for bar, mean in zip(bars, acc_means):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                f"{mean:.3f}", ha="center", va="bottom", fontsize=9)
-    plt.xticks(rotation=15)
-    plt.tight_layout()
-    fig.savefig(MODELOS_DIR / "cross_validation_comparacion.png", dpi=130, bbox_inches="tight")
-    plt.close(fig)
-    print(f"\n✅ Gráfico guardado: {MODELOS_DIR / 'cross_validation_comparacion.png'}")
+    print(
+        f"\n✅ Resumen guardado en: "
+        f"{ruta_resumen}"
+    )
+
+    print(
+        f"✅ Resultados por fold guardados en: "
+        f"{ruta_folds}"
+    )
+
+    print(
+        f"✅ Gráfico guardado en: "
+        f"{CROSS_VALIDATION_DIR / 'cross_validation_comparacion.png'}"
+    )
+
+    print(
+        "\n⚠️ H1 y H2 no se incluyen en este script "
+        "hasta ejecutar su validación cruzada real."
+    )
 
 
 if __name__ == "__main__":
