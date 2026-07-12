@@ -13,7 +13,9 @@ elif hasattr(sys.stdout, 'buffer'):
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from matplotlib.backends.backend_pdf import PdfPages
+import textwrap
 from PIL import Image
 import tensorflow as tf
 try:
@@ -1518,6 +1520,23 @@ def get_treatment_recommendations(disease, language='es'):
     
     return recommendations.get(disease, {})
 
+from matplotlib import font_manager as _fm
+from fontTools.ttLib import TTFont as _TTFont
+
+_DEJAVU_CMAP = None
+
+def _pdf_safe_text(texto: str) -> str:
+    """Elimina caracteres (típicamente emoji a color) que la fuente DejaVu
+    Sans usada por matplotlib no puede dibujar, evitando que aparezcan
+    como cuadros vacíos en los PDF. No afecta tildes, ñ ni signos de
+    puntuación en español/portugués, que sí están soportados."""
+    global _DEJAVU_CMAP
+    if _DEJAVU_CMAP is None:
+        font_path = _fm.findfont('DejaVu Sans')
+        _DEJAVU_CMAP = _TTFont(font_path).getBestCmap()
+    limpio = "".join(ch for ch in texto if ch.isascii() or ord(ch) in _DEJAVU_CMAP)
+    return " ".join(limpio.split())
+
 # ======= FUNCIÓN PDF MEJORADA (SIN ANÁLISIS ESTADÍSTICO) =======
 def generate_diagnosis_pdf(image, results, consensus_disease):
     """Genera un reporte PDF del diagnóstico sin análisis estadístico"""
@@ -1543,15 +1562,25 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
 
     try:
         with PdfPages(pdf_filename) as pdf:
-
-            # ====================== PÁGINA 1: PORTADA ======================
+# ====================== PÁGINA 1: PORTADA ======================
             fig = plt.figure(figsize=(8.27, 11.69))
             fig.patch.set_facecolor('white')
 
-            # Título principal
-            fig.text(0.5, 0.9, get_text('title', current_language), fontsize=24, fontweight='bold',
-                     ha='center', color='#2E8B57')
-            
+            # Eje transparente de overlay para dibujar cajas de color
+            # (coordenadas 0-1 = misma fracción de figura que fig.text)
+            ax_overlay = fig.add_axes([0, 0, 1, 1])
+            ax_overlay.set_xlim(0, 1)
+            ax_overlay.set_ylim(0, 1)
+            ax_overlay.axis('off')
+
+            # Franja de encabezado con color (verde + filete morado)
+            ax_overlay.add_patch(mpatches.Rectangle((0, 0.90), 1, 0.10, color='#2E8B57', zorder=0))
+            ax_overlay.add_patch(mpatches.Rectangle((0, 0.895), 1, 0.006, color='#6A4C93', zorder=1))
+
+            # Título dentro de la franja
+            fig.text(0.5, 0.955, _pdf_safe_text(get_text('title', current_language)), fontsize=22, fontweight='bold',
+                     ha='center', va='center', color='white')
+
             # Subtítulo según idioma
             if current_language == 'en':
                 subtitle = 'Vineyard Disease Diagnosis Report'
@@ -1559,15 +1588,29 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                 subtitle = 'Relatório de Diagnóstico de Doenças em Vinhedos'
             else:  # español
                 subtitle = 'Reporte de Diagnóstico de Enfermedades en Viñedos'
-                
-            fig.text(0.5, 0.85, subtitle, fontsize=14, ha='center', color='#333333')
 
-            # Información del reporte
+            fig.text(0.5, 0.878, subtitle, fontsize=13, ha='center', color='#EAF7EF', style='italic')
+
+            # Información del reporte (columna izquierda)
             date_label = 'Date:' if current_language == 'en' else 'Data:' if current_language == 'pt' else 'Fecha:'
             models_label = 'Models used:' if current_language == 'en' else 'Modelos utilizados:' if current_language == 'pt' else 'Modelos utilizados:'
-            
-            fig.text(0.1, 0.75, f'{date_label} {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', fontsize=11)
-            fig.text(0.1, 0.72, f'{models_label} {len(results)}', fontsize=11)
+
+            fig.text(0.08, 0.83, f'{date_label} {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', fontsize=10, color='#2B2B2B')
+            fig.text(0.08, 0.805, f'{models_label} {len(results)}', fontsize=10, color='#2B2B2B')
+
+            # Miniatura de la imagen diagnosticada (columna derecha)
+            try:
+                ax_img = fig.add_axes([0.62, 0.755, 0.30, 0.14])
+                ax_img.imshow(image)
+                ax_img.set_xticks([])
+                ax_img.set_yticks([])
+                for spine in ax_img.spines.values():
+                    spine.set_edgecolor('#2E8B57')
+                    spine.set_linewidth(2)
+                img_caption = 'Analyzed image' if current_language == 'en' else 'Imagem analisada' if current_language == 'pt' else 'Imagen analizada'
+                ax_img.set_xlabel(img_caption, fontsize=8, color='#555555')
+            except Exception:
+                pass
 
             # Diagnóstico principal
             predictions = [r['predicted_class'] for r in results]
@@ -1587,34 +1630,70 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                 else None
             )
 
+            # Caja con fondo de color para el diagnóstico principal (verde)
+            ax_overlay.add_patch(mpatches.FancyBboxPatch(
+                (0.06, 0.58), 0.88, 0.15,
+                boxstyle="round,pad=0.012,rounding_size=0.02",
+                linewidth=1.5, edgecolor='#2E8B57', facecolor='#E8F5EC', zorder=1,
+            ))
+
             # Etiquetas traducidas
             main_diagnosis_label = 'MAIN DIAGNOSIS' if current_language == 'en' else 'DIAGNÓSTICO PRINCIPAL' if current_language == 'pt' else 'DIAGNÓSTICO PRINCIPAL'
             disease_label = 'Disease:' if current_language == 'en' else 'Doença:' if current_language == 'pt' else 'Enfermedad:'
             confidence_label = 'Confidence:' if current_language == 'en' else 'Confiança:' if current_language == 'pt' else 'Confianza:'
             consensus_label = 'Consensus:' if current_language == 'en' else 'Consenso:' if current_language == 'pt' else 'Consenso:'
 
-            fig.text(0.1, 0.6, main_diagnosis_label, fontsize=16, fontweight='bold', color='#2E8B57')
-            fig.text(0.1, 0.55, f'{disease_label} {get_disease_names(current_language)[consensus]}', fontsize=12)
+            fig.text(0.1, 0.70, f'■ {main_diagnosis_label}', fontsize=15, fontweight='bold', color='#1F6B45')
+            fig.text(0.1, 0.665, f'{disease_label} {get_disease_names(current_language)[consensus]}', fontsize=13, fontweight='bold', color='#2B2B2B')
             confidence_text = (
                 f"{consensus_confidence:.1%}"
                 if consensus_confidence is not None
                 else "No disponible"
             )
-            fig.text(0.1, 0.52, f'{confidence_label} {confidence_text}', fontsize=12)
-            fig.text(0.1, 0.49, f'{consensus_label} {consensus_count}/{len(results)} modelos', fontsize=12)
+            fig.text(0.1, 0.635, f'{confidence_label} {confidence_text}', fontsize=11, color='#2B2B2B')
+            fig.text(0.1, 0.61, f'{consensus_label} {consensus_count}/{len(results)} modelos', fontsize=11, color='#2B2B2B')
 
-            # Recomendaciones clave
+            # Caja con fondo de color para el modelo ganador del sistema (morado)
+            ax_overlay.add_patch(mpatches.FancyBboxPatch(
+                (0.06, 0.46), 0.88, 0.10,
+                boxstyle="round,pad=0.012,rounding_size=0.02",
+                linewidth=1.5, edgecolor='#6A4C93', facecolor='#F1ECF7', zorder=1,
+            ))
+            model_winner_label = (
+                'SYSTEM WINNING MODEL' if current_language == 'en'
+                else 'MODELO VENCEDOR DO SISTEMA' if current_language == 'pt'
+                else 'MODELO GANADOR DEL SISTEMA'
+            )
+            fig.text(0.1, 0.535, f'★ {model_winner_label}: H1 - CNN + SVM',
+                     fontsize=12, fontweight='bold', color='#4B3569')
+            fig.text(
+                0.1, 0.50,
+                'Accuracy: 98.9%  |  MCC: 0.985  |  Seleccionado tras '
+                'validación estadística (McNemar, Cochran Q, Bootstrap)',
+                fontsize=9, color='#5c4a70',
+            )
+
+            # Recomendaciones clave (caja combinando verde + borde morado)
             if recommendations:
                 key_recommendations_label = 'KEY RECOMMENDATIONS' if current_language == 'en' else 'RECOMENDAÇÕES PRINCIPAIS' if current_language == 'pt' else 'RECOMENDACIONES CLAVE'
                 severity_label = 'Severity:' if current_language == 'en' else 'Gravidade:' if current_language == 'pt' else 'Gravedad:'
                 action_label = 'Action:' if current_language == 'en' else 'Ação:' if current_language == 'pt' else 'Acción:'
-                
-                fig.text(0.1, 0.4, key_recommendations_label, fontsize=14, fontweight='bold', color='#2E8B57')
-                fig.text(0.1, 0.35, f'{severity_label} {recommendations.get("gravedad", "N/A")}', fontsize=11)
+
+                ax_overlay.add_patch(mpatches.FancyBboxPatch(
+                    (0.06, 0.30), 0.88, 0.115,
+                    boxstyle="round,pad=0.012,rounding_size=0.02",
+                    linewidth=1.5, edgecolor='#6A4C93', facecolor='#E8F5EC', zorder=1,
+                ))
+                fig.text(0.1, 0.375, f'◆ {key_recommendations_label}', fontsize=13, fontweight='bold', color='#1F6B45')
+                fig.text(0.1, 0.34, f'{severity_label} {recommendations.get("gravedad", "N/A")}', fontsize=11, color='#2B2B2B')
                 action = recommendations.get('tratamiento', ['N/A'])[0] if recommendations.get('tratamiento') else 'N/A'
                 if len(action) > 60:
                     action = action[:60] + "..."
-                fig.text(0.1, 0.32, f'{action_label} {action}', fontsize=10)
+                fig.text(0.1, 0.31, f'{action_label} {action}', fontsize=10, color='#2B2B2B')
+
+            # Pie de página
+            fig.text(0.5, 0.03, 'VineGuard AI © 2026 — Reporte generado automáticamente',
+                     fontsize=8, ha='center', color='#9A9A9A', style='italic')
 
             plt.axis('off')
             pdf.savefig(fig, bbox_inches='tight')
@@ -1636,7 +1715,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                 else 0.0
                 for r in results
             ]
-            colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
+            colors = ['#2E8B57', '#6A4C93', '#8FBF9F', '#B39DDB']
 
             bars1 = ax1.bar(range(len(model_names)), confidences, color=colors)
             
@@ -1648,6 +1727,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             ax1.set_ylabel(confidence_ylabel)
             ax1.set_xticks(range(len(model_names)))
             ax1.set_xticklabels([name.replace(' ', '\n') for name in model_names], fontsize=9)
+            ax1.spines[['top', 'right']].set_visible(False)
 
             for bar, resultado in zip(bars1, results):
                 height = bar.get_height()
@@ -1672,6 +1752,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             ax2.set_ylabel(time_ylabel)
             ax2.set_xticks(range(len(model_names)))
             ax2.set_xticklabels([name.replace(' ', '\n') for name in model_names], fontsize=9)
+            ax2.spines[['top', 'right']].set_visible(False)
 
             for bar, time in zip(bars2, inference_times):
                 height = bar.get_height()
@@ -1702,7 +1783,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                 wedges, texts, autotexts = ax3.pie(
                     all_probs, labels=disease_names_translated,
                     autopct='%1.1f%%', startangle=90,
-                    colors=['#FFB6C1', '#98FB98', '#87CEEB', '#DDA0DD'],
+                    colors=['#2E8B57', '#6A4C93', '#8FBF9F', '#C9B6E4'],
                 )
                 probabilities_title = (
                     f'Probabilities\n({best_result["model_name"]})'
@@ -1732,7 +1813,8 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             labels = [get_disease_names(current_language)[k] for k in consensus_data.keys()]
             values = list(consensus_data.values())
 
-            bars4 = ax4.bar(range(len(labels)), values, color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'])
+            consensus_palette = ['#2E8B57', '#6A4C93', '#8FBF9F', '#B39DDB']
+            bars4 = ax4.bar(range(len(labels)), values, color=consensus_palette[:len(labels)])
             
             # Títulos traducidos
             consensus_title = 'Model Consensus' if current_language == 'en' else 'Consenso entre Modelos' if current_language == 'pt' else 'Consenso entre Modelos'
@@ -1742,6 +1824,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             ax4.set_ylabel(models_ylabel)
             ax4.set_xticks(range(len(labels)))
             ax4.set_xticklabels([label.replace(' ', '\n') for label in labels], fontsize=8)
+            ax4.spines[['top', 'right']].set_visible(False)
 
             for bar, val in zip(bars4, values):
                 height = bar.get_height()
@@ -1776,7 +1859,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             else:
                 confusion_matrix_data = np.identity(len(DISEASE_CLASSES), dtype=int)
 
-            im = ax_matrix.imshow(confusion_matrix_data, interpolation='nearest', cmap='Blues')
+            im = ax_matrix.imshow(confusion_matrix_data, interpolation='nearest', cmap='Purples')
             
             confusion_matrix_title = f'Confusion Matrix - {modelo_referencia["model_name"]}' if current_language == 'en' else f'Matriz de Confusão - {modelo_referencia["model_name"]}' if current_language == 'pt' else f'Matriz de Confusión - {modelo_referencia["model_name"]}'
             if not cm_is_real:
@@ -1840,6 +1923,12 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
                 table[(0, i)].set_facecolor('#2E8B57')
                 table[(0, i)].set_text_props(weight='bold', color='white')
 
+            # Filas alternadas verde/morado suave para mejor lectura
+            for row_idx in range(1, len(table_data) + 1):
+                fill = '#F1ECF7' if row_idx % 2 == 0 else '#E8F5EC'
+                for col_idx in range(len(headers)):
+                    table[(row_idx, col_idx)].set_facecolor(fill)
+
             ax_table.set_title('Información de Entrenamiento y Rendimiento',
                                fontweight='bold', fontsize=14, pad=20)
 
@@ -1848,34 +1937,64 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
 
             # ====================== PÁGINA 4: RECOMENDACIONES ======================
             fig = plt.figure(figsize=(8.27, 11.69))
+            fig.patch.set_facecolor('white')
+            ax_overlay4 = fig.add_axes([0, 0, 1, 1])
+            ax_overlay4.set_xlim(0, 1)
+            ax_overlay4.set_ylim(0, 1)
+            ax_overlay4.axis('off')
+
+            ax_overlay4.add_patch(mpatches.Rectangle((0, 0.93), 1, 0.07, color='#6A4C93', zorder=0))
             treatment_recommendations_title = 'Treatment Recommendations' if current_language == 'en' else 'Recomendações de Tratamento' if current_language == 'pt' else 'Recomendaciones de Tratamiento'
-            fig.text(0.5, 0.95, treatment_recommendations_title, fontsize=16, fontweight='bold', ha='center')
+            fig.text(0.5, 0.965, treatment_recommendations_title.upper(), fontsize=16, fontweight='bold', ha='center', color='white')
 
             if recommendations:
-                fig.text(0.1, 0.85, recommendations.get('titulo', ''), fontsize=14, fontweight='bold', color='#B22222')
-                
+                fig.text(0.08, 0.895, _pdf_safe_text(recommendations.get('titulo', '')), fontsize=13, fontweight='bold', color='#4B3569')
                 severity_label = 'Severity:' if current_language == 'en' else 'Gravidade:' if current_language == 'pt' else 'Gravedad:'
-                fig.text(0.1, 0.8, f"{severity_label} {recommendations.get('gravedad', 'N/A')}", fontsize=12, fontweight='bold')
+                sev = recommendations.get('gravedad', 'N/A')
+                ax_overlay4.add_patch(mpatches.FancyBboxPatch(
+                    (0.08, 0.855), 0.30, 0.03, boxstyle="round,pad=0.006,rounding_size=0.01",
+                    linewidth=1, edgecolor='#6A4C93', facecolor='#F1ECF7', zorder=1))
+                fig.text(0.095, 0.865, f'{severity_label} {sev}', fontsize=9.5, fontweight='bold', color='#4B3569')
 
-                # Tratamientos
-                recommended_treatments_label = 'RECOMMENDED TREATMENTS:' if current_language == 'en' else 'TRATAMENTOS RECOMENDADOS:' if current_language == 'pt' else 'TRATAMIENTOS RECOMENDADOS:'
-                fig.text(0.1, 0.7, recommended_treatments_label, fontsize=12, fontweight='bold')
-                y_pos = 0.65
-                for i, item in enumerate(recommendations.get('tratamiento', []), 1):
-                    fig.text(0.1, y_pos, f"{i}. {item}", fontsize=10)
-                    y_pos -= 0.04
+                # Tratamientos (caja verde, alto dinámico según cantidad de items)
+                recommended_treatments_label = 'RECOMMENDED TREATMENTS' if current_language == 'en' else 'TRATAMENTOS RECOMENDADOS' if current_language == 'pt' else 'TRATAMIENTOS RECOMENDADOS'
+                tratamientos = recommendations.get('tratamiento', [])
+                n_t = max(len(tratamientos), 1)
+                box1_top, box1_h = 0.80, 0.045 + 0.05 * n_t
+                ax_overlay4.add_patch(mpatches.FancyBboxPatch(
+                    (0.06, box1_top - box1_h), 0.88, box1_h, boxstyle="round,pad=0.012,rounding_size=0.02",
+                    linewidth=1.5, edgecolor='#2E8B57', facecolor='#E8F5EC', zorder=1))
+                fig.text(0.09, box1_top - 0.035, f'■ {recommended_treatments_label}', fontsize=12, fontweight='bold', color='#1F6B45')
+                y_pos = box1_top - 0.07
+                for i, item in enumerate(tratamientos, 1):
+                    wrapped = textwrap.fill(item, width=78)
+                    for line_i, line in enumerate(wrapped.split('\n')):
+                        prefix = f'{i}. ' if line_i == 0 else '    '
+                        fig.text(0.10, y_pos, f'{prefix}{line}', fontsize=10, color='#2B2B2B')
+                        y_pos -= 0.032
 
-                # Prevención
-                preventive_measures_label = 'PREVENTIVE MEASURES:' if current_language == 'en' else 'MEDIDAS PREVENTIVAS:' if current_language == 'pt' else 'MEDIDAS PREVENTIVAS:'
-                fig.text(0.1, 0.4, preventive_measures_label, fontsize=12, fontweight='bold')
-                y_pos = 0.35
-                for i, item in enumerate(recommendations.get('prevencion', []), 1):
-                    fig.text(0.1, y_pos, f"{i}. {item}", fontsize=10)
-                    y_pos -= 0.04
+                # Prevención (caja morada, alto dinámico según cantidad de items)
+                preventive_measures_label = 'PREVENTIVE MEASURES' if current_language == 'en' else 'MEDIDAS PREVENTIVAS' if current_language == 'pt' else 'MEDIDAS PREVENTIVAS'
+                prevenciones = recommendations.get('prevencion', [])
+                n_p = max(len(prevenciones), 1)
+                box2_top = box1_top - box1_h - 0.04
+                box2_h = 0.045 + 0.05 * n_p
+                ax_overlay4.add_patch(mpatches.FancyBboxPatch(
+                    (0.06, box2_top - box2_h), 0.88, box2_h, boxstyle="round,pad=0.012,rounding_size=0.02",
+                    linewidth=1.5, edgecolor='#6A4C93', facecolor='#F1ECF7', zorder=1))
+                fig.text(0.09, box2_top - 0.035, f'◆ {preventive_measures_label}', fontsize=12, fontweight='bold', color='#4B3569')
+                y_pos = box2_top - 0.07
+                for i, item in enumerate(prevenciones, 1):
+                    wrapped = textwrap.fill(item, width=78)
+                    for line_i, line in enumerate(wrapped.split('\n')):
+                        prefix = f'{i}. ' if line_i == 0 else '    '
+                        fig.text(0.10, y_pos, f'{prefix}{line}', fontsize=10, color='#2B2B2B')
+                        y_pos -= 0.032
 
             # Nota
             note_text = 'Note: Consult with a specialist before applying treatments.' if current_language == 'en' else 'Nota: Consulte um especialista antes de aplicar tratamentos.' if current_language == 'pt' else 'Nota: Consulte con un especialista antes de aplicar tratamientos.'
-            fig.text(0.1, 0.1, note_text, fontsize=10, style='italic')
+            fig.text(0.5, 0.06, note_text, fontsize=9, ha='center', style='italic', color='#6E6E6E')
+            fig.text(0.5, 0.03, 'VineGuard AI © 2026', fontsize=8, ha='center', color='#9A9A9A', style='italic')
 
             plt.axis('off')
             pdf.savefig(fig, bbox_inches='tight')
@@ -1891,7 +2010,7 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
         # Limpiar archivo temporal
         if os.path.exists(pdf_filename):
             os.unlink(pdf_filename)
-
+            
 # ======= FUNCIÓN WORD =======
 def generate_diagnosis_docx(image, results, consensus_disease):
     """Genera un reporte Word del diagnóstico"""
@@ -1920,6 +2039,16 @@ def generate_diagnosis_docx(image, results, consensus_disease):
     
     doc.add_heading('Diagnóstico Principal', level=2)
     doc.add_paragraph(f'{get_disease_names(current_language)[consensus_disease]}')
+
+    # Modelo ganador del sistema
+    doc.add_heading('🏆 Modelo Ganador del Sistema', level=2)
+    p = doc.add_paragraph()
+    run = p.add_run('H1 - CNN + SVM')
+    run.bold = True
+    doc.add_paragraph(
+        'Accuracy: 98.9%  |  MCC: 0.985  |  Seleccionado tras validación '
+        'estadística (McNemar, Cochran, Friedman)'
+    )
     
     # Resultados por modelo
     doc.add_heading('Resultados por Modelo', level=2)
@@ -2028,18 +2157,55 @@ def generate_diagnosis_xlsx(image, results, consensus_disease):
         ws.cell(row=row_num, column=3, value=confidence_text)
         ws.cell(row=row_num, column=4, value=f'{result["inference_time"]:.0f}')
     
-    # Ajustar ancho de columnas
+    # Recomendaciones de tratamiento
+    next_row = len(results) + 9
+    if recommendations:
+        ws.cell(row=next_row, column=1, value='Recomendaciones de Tratamiento')
+        ws.cell(row=next_row, column=1).font = header_font
+        ws.cell(row=next_row, column=1).fill = header_fill
+        ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=4)
+        next_row += 1
+
+        ws.cell(row=next_row, column=1, value='Gravedad:')
+        ws.cell(row=next_row, column=1).font = Font(bold=True)
+        ws.cell(row=next_row, column=2, value=recommendations.get('gravedad', 'N/A'))
+        ws.merge_cells(start_row=next_row, start_column=2, end_row=next_row, end_column=4)
+        next_row += 2
+
+        ws.cell(row=next_row, column=1, value='Tratamiento')
+        ws.cell(row=next_row, column=1).font = Font(bold=True)
+        next_row += 1
+        for item in recommendations.get('tratamiento', []):
+            ws.cell(row=next_row, column=1, value=f'- {item}')
+            ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=4)
+            next_row += 1
+        next_row += 1
+
+        ws.cell(row=next_row, column=1, value='Prevención')
+        ws.cell(row=next_row, column=1).font = Font(bold=True)
+        next_row += 1
+        for item in recommendations.get('prevencion', []):
+            ws.cell(row=next_row, column=1, value=f'- {item}')
+            ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=4)
+            next_row += 1
+
+# Ajustar ancho de columnas
+    from openpyxl.cell.cell import MergedCell
+
     for col in ws.columns:
         max_length = 0
-        column = col[0].column_letter
+        column_letter = None
         for cell in col:
+            if isinstance(cell, MergedCell):
+                continue
+            column_letter = cell.column_letter
             try:
-                if len(str(cell.value)) > max_length:
+                if cell.value and len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except Exception:
                 pass
-        adjusted_width = (max_length + 2)
-        ws.column_dimensions[column].width = adjusted_width
+        if column_letter:
+            ws.column_dimensions[column_letter].width = max_length + 2
     
     # Guardar Excel
     with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
@@ -2354,6 +2520,19 @@ def main():
                 with col1:
                     st.image(image, caption=get_text('image_loaded', st.session_state.language), use_column_width=True)
 
+# Modo de predicción: modelo ganador vs comparar todos
+                st.markdown("##### 🏆 Modo de diagnóstico")
+                modo_prediccion = st.radio(
+                    "Selecciona cómo quieres diagnosticar la imagen:",
+                    [
+                        "⭐ Modelo ganador (H1 - CNN + SVM) — Recomendado",
+                        "🔬 Comparar todos los modelos",
+                    ],
+                    horizontal=False,
+                    key="modo_prediccion_diagnostico",
+                )
+                usar_solo_ganador = modo_prediccion.startswith("⭐")
+
                 # Botón de análisis
                 if st.button(get_text('analyze_image', st.session_state.language), type="primary"):
                     with st.spinner(get_text('analyzing', st.session_state.language)):
@@ -2364,13 +2543,26 @@ def main():
                                 "Carga los modelos antes de analizar."
                             )
                             st.stop()
+
+                        if usar_solo_ganador:
+                            if "H1" not in modelos_disponibles:
+                                st.error(
+                                    "El modelo ganador (H1) no está disponible. "
+                                    "Verifica que los modelos estén cargados correctamente."
+                                )
+                                st.stop()
+                            modelos_a_usar = ["H1"]
+                        else:
+                            modelos_a_usar = modelos_disponibles
+
                         results = []
-                        for model_key in modelos_disponibles:
+                        for model_key in modelos_a_usar:
                             display_name = MODEL_DISPLAY_NAMES[model_key]
                             result = predict_disease(image, model_key, display_name)
                             results.append(result)
 
                         st.session_state.predictions = results
+                        st.session_state.usar_solo_ganador = usar_solo_ganador
                         st.session_state.pdf_bytes = None
                         st.session_state.pdf_ready = False
 
@@ -2387,10 +2579,15 @@ def main():
 
                     st.success(get_text('analysis_completed', st.session_state.language))
 
-                    if len(results) == 1:
+                    if len(results) == 1 and not st.session_state.get("usar_solo_ganador", False):
                         st.warning(
                             "Solo un modelo produjo una predicción. "
                             "No es posible calcular consenso robusto."
+                        )
+                    elif len(results) == 1 and st.session_state.get("usar_solo_ganador", False):
+                        st.success(
+                            "🏆 Diagnóstico realizado con el modelo ganador "
+                            "(H1 - CNN + SVM, Accuracy 98.9%, MCC 0.985)."
                         )
 
                     # Mostrar resultados por modelo
@@ -2413,41 +2610,58 @@ def main():
                             )
                             st.caption(f"⏱️ {result['inference_time']:.1f} ms")
 
-                    # Consenso de modelos
-                    st.subheader(get_text('consensus_diagnosis', st.session_state.language))
-
-                    # Calcular diagnóstico más frecuente
+# Consenso de modelos
                     predictions = [r['predicted_class'] for r in results]
-                    consensus = max(set(predictions), key=predictions.count)
-                    consensus_count = predictions.count(consensus)
 
-                    confianzas_consenso = [
-                        r['confidence']
-                        for r in results
-                        if (
-                            r['predicted_class'] == consensus
-                            and r.get('confidence') is not None
+                    if not st.session_state.get("usar_solo_ganador", False):
+                        st.subheader(get_text('consensus_diagnosis', st.session_state.language))
+
+                        # Calcular diagnóstico más frecuente
+                        consensus = max(set(predictions), key=predictions.count)
+                        consensus_count = predictions.count(consensus)
+
+                        confianzas_consenso = [
+                            r['confidence']
+                            for r in results
+                            if (
+                                r['predicted_class'] == consensus
+                                and r.get('confidence') is not None
+                            )
+                        ]
+                        consensus_confidence = (
+                            float(np.mean(confianzas_consenso))
+                            if confianzas_consenso
+                            else None
                         )
-                    ]
-                    consensus_confidence = (
-                        float(np.mean(confianzas_consenso))
-                        if confianzas_consenso
-                        else None
-                    )
 
-                    # Mostrar consenso
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    with col1:
-                        st.info(f"**{get_text('final_diagnosis', st.session_state.language)}** {get_disease_names(st.session_state.language)[consensus]}")
-                    with col2:
-                        st.metric(get_text('coincidence', st.session_state.language), f"{consensus_count}/{len(predictions)}")
-                    with col3:
+                        # Mostrar consenso
+                        col1, col2, col3 = st.columns([2, 1, 1])
+                        with col1:
+                            st.info(f"**{get_text('final_diagnosis', st.session_state.language)}** {get_disease_names(st.session_state.language)[consensus]}")
+                        with col2:
+                            st.metric(get_text('coincidence', st.session_state.language), f"{consensus_count}/{len(predictions)}")
+                        with col3:
+                            confidence_text = (
+                                f"{consensus_confidence:.1%}"
+                                if consensus_confidence is not None
+                                else "No disponible"
+                            )
+                            st.metric(get_text('confidence', st.session_state.language).title(), confidence_text)
+                    else:
+                        # Modo "solo modelo ganador": no hay consenso entre
+                        # varios modelos, se muestra directo el diagnóstico de H1.
+                        consensus = results[0]['predicted_class']
+                        st.subheader("🏆 Diagnóstico (Modelo Ganador)")
                         confidence_text = (
-                            f"{consensus_confidence:.1%}"
-                            if consensus_confidence is not None
+                            f"{results[0]['confidence']:.1%}"
+                            if results[0].get('confidence') is not None
                             else "No disponible"
                         )
-                        st.metric(get_text('confidence', st.session_state.language).title(), confidence_text)
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            st.info(f"**{get_text('final_diagnosis', st.session_state.language)}** {get_disease_names(st.session_state.language)[consensus]}")
+                        with col2:
+                            st.metric(get_text('confidence', st.session_state.language).title(), confidence_text)
 
                     # Gráfico de probabilidades
                     st.subheader(get_text('probability_distribution', st.session_state.language))
