@@ -1,0 +1,2 @@
+modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,auc_macro,auc_micro,tiempo_carga_preprocesamiento_features_s,tiempo_entrenamiento_s,tiempo_evaluacion_s,tiempo_inferencia_ms,tiempo_guardado_modelo_s,tiempo_total_proceso_s,n_muestras_train,n_muestras_test,n_features,model_size_mb,semilla,n_estimators,max_depth,min_samples_split,min_samples_leaf,class_weight,n_jobs
+M2 — Random Forest,0.9582,0.9657,0.9591,0.9582,0.9584,0.9422,0.997,0.9974,196.1,4.53,1.62,0.1775,0.0784,202.33,6000,814,227,11.835,42,200,,2,1,,-1

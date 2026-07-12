@@ -84,7 +84,7 @@ dataset_original/
 | H1 | CNN + SVM | CNN Simple (256 dims) | SVM RBF |
 | H2 | Transfer + RF | MobileNetV2 ImageNet (1280 dims) | Random Forest |
 
-## Flujo de Trabajo Completo
+## Flujo de Trabajo Completo (Segun Requerimientos Docente)
 
 Ejecutar en orden desde la raíz del proyecto:
 
@@ -92,37 +92,39 @@ Ejecutar en orden desde la raíz del proyecto:
 # PASO 1 — Preparar dataset (80% train / 20% test)
 python src/prepare_dataset.py
 
-# PASO 2 — EDA y validación de calidad del dataset
+# PASO 2 — Análisis Exploratorio de Datos (EDA) y limpieza de datos
 python src/eda_validacion_datos.py
 
 # PASO 3 — Preprocesamiento y aumento de datos
 python src/preprocesamiento_aumento.py
 
-# PASO 4 — Entrenar modelos clásicos
+# PASO 4 — Entrenamiento de modelos (3 clásicos + 2 híbridos)
+# (Genera matrices de confusión, curvas ROC, guarda modelos para usar sin reentrenar)
 python src/train_m1_svm.py
 python src/train_m2_random_forest.py
 python src/train_m3_knn.py
-
-# PASO 5 — Entrenar modelos híbridos
 python src/train_h1_cnn_svm.py
 python src/train_h2_transfer_random_forest.py
 
-# PASO 6 — Validación cruzada (5 folds)
+# PASO 5 — Validación cruzada (configurable, default: 5 folds)
 python src/cross_validation_modelos.py
 
-# PASO 7 — Optimización de hiperparámetros (GridSearch)
+# PASO 6 — Optimización de hiperparámetros (tuning con GridSearchCV)
 python src/optimizacion_hiperparametros.py
 
-# PASO 8 — Validación estadística robusta (McNemar, Cochran, Friedman, Bootstrap)
+# PASO 7 — Pruebas estadísticas robustas (McNemar, Cochran, Friedman, Bootstrap)
 python src/validacion_estadistica_modelos.py
 
-# PASO 9 — Selección del mejor modelo (ranking compuesto ponderado)
+# PASO 8 — Selección del mejor modelo y generación de reportes
 python src/seleccion_mejor_modelo.py
 
-# PASO 10 — Lanzar la aplicación web
+# PASO 9 — Lanzar la aplicación web (requiere inicio de sesión primero)
+# Credenciales: admin/admin123 | usuario/12345
 streamlit run app.py
 ```
 
+> **Nota sobre validación cruzada**: Edita `src/cross_validation_modelos.py` para cambiar el número de folds (`n_splits`).
+> **Reportes disponibles en la app**: PDF, Word (.docx) y Excel (.xlsx)
 > **Tiempo estimado total** (sin GPU): 30–60 minutos. Con GPU: 10–20 minutos.
 
 ## 1. EDA y Validación de Datos
@@ -272,7 +274,7 @@ Resultados en `reports/modelos/`:
 
 ## 8. Aplicación de Diagnóstico (Streamlit)
 
-La app `app.py` permite:
+La app `app.py` requiere **inicio de sesión** primero (credenciales: `admin/admin123` o `usuario/12345`). Permite:
 - Cargar los 5 modelos entrenados
 - Subir una imagen de hoja de vid
 - Obtener predicción de todos los modelos con tiempos de inferencia
@@ -280,7 +282,7 @@ La app `app.py` permite:
 - Visualizar matrices de confusión y curvas ROC de cada modelo
 - Visualizar distribución de probabilidades por modelo
 - Recibir recomendaciones de tratamiento según la enfermedad
-- Descargar reporte PDF profesional con gráficos
+- Descargar reportes en **PDF, Word (.docx) y Excel (.xlsx)**
 - Validación estadística con dataset propio (MCC + McNemar)
 - Interfaz multiidioma (Español, Inglés, Portugués)
 - Panel lateral con estado del pipeline experimental completo

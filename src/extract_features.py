@@ -110,7 +110,7 @@ def _obtener_rutas_por_clase(split_dir: Path):
 
 def _cargar_test_sin_aumento() -> tuple:
     rutas_test = _obtener_rutas_por_clase(TEST_DIR)
-    X_list, y_list = [], []
+    X_list, y_list, filenames_list = [], [], []
     for clase in CLASS_NAMES:
         info = rutas_test.get(clase)
         if info is None:
@@ -120,9 +120,11 @@ def _cargar_test_sin_aumento() -> tuple:
             feats = extraer_caracteristicas_imagen(ruta)
             X_list.append(feats)
             y_list.append(idx)
+            filenames_list.append(ruta.name)
     X_test = np.array(X_list, dtype=np.float32)
     y_test = np.array(y_list, dtype=np.int32)
-    return X_test, y_test
+    filenames_test = np.array(filenames_list, dtype=str)
+    return X_test, y_test, filenames_test
 
 
 def cargar_balanceado() -> tuple:
@@ -192,7 +194,7 @@ def cargar_balanceado() -> tuple:
     X_train, y_train = X_train[perm], y_train[perm]
 
     print("🔍 Cargando TEST (solo imágenes reales, sin aumento)...")
-    X_test, y_test = _cargar_test_sin_aumento()
+    X_test, y_test, filenames_test = _cargar_test_sin_aumento()
 
     print(f"\n📊 Dimensiones:")
     print(f"   X_train: {X_train.shape}")
@@ -212,12 +214,12 @@ def cargar_balanceado() -> tuple:
         "total_efectivo": total_efectivo,
     }
 
-    return X_train, y_train, X_test, y_test, resumen_dict
+    return X_train, y_train, X_test, y_test, filenames_test, resumen_dict
 
 
 def load_features(fit_scaler: bool = True, augment_train: bool = True, apply_scaler: bool = True, scaler_path: Path = SCALER_PATH):
     if augment_train:
-        X_train, y_train, X_test, y_test, _ = cargar_balanceado()
+        X_train, y_train, X_test, y_test, filenames_test, _ = cargar_balanceado()
         from collections import Counter
         conteos = Counter(y_train)
         for i, cls in enumerate(CLASS_NAMES):
@@ -243,7 +245,7 @@ def load_features(fit_scaler: bool = True, augment_train: bool = True, apply_sca
         y_train = np.array(y_train_list, dtype=np.int32)
         print(f"   Train: {X_train.shape}")
         print("🔍 Cargando TEST (sin aumento)...")
-        X_test, y_test = _cargar_test_sin_aumento()
+        X_test, y_test, filenames_test = _cargar_test_sin_aumento()
         print(f"   Test: {X_test.shape}")
         print("   ℹ️  Train cargado con su distribución original, sin balanceo")
 
@@ -269,7 +271,7 @@ def load_features(fit_scaler: bool = True, augment_train: bool = True, apply_sca
             else:
                 print("⚠️  No se encontró scaler.pkl. Datos no estandarizados.")
 
-    return X_train, y_train, X_test, y_test
+    return X_train, y_train, X_test, y_test, filenames_test
 
 
 def extract_single_image_features(img_path_or_pil, apply_scaler: bool = True, scaler_path: Path = SCALER_PATH) -> np.ndarray:

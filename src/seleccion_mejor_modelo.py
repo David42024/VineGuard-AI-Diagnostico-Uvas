@@ -13,7 +13,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mantenedor import MODELOS_DIR, ESTADISTICA_DIR, CLASS_NAMES
+from mantenedor import (
+    MODELOS_DIR, ESTADISTICA_DIR, COMPARATIVOS_DIR, CLASS_NAMES,
+    M1_SVM_REPORTS_DIR, M2_RF_REPORTS_DIR, M3_KNN_REPORTS_DIR,
+    H1_CNN_SVM_REPORTS_DIR, H2_TRANSFER_RF_REPORTS_DIR,
+)
 
 import sys
 if hasattr(sys.stdout, 'reconfigure'):
@@ -29,11 +33,11 @@ ESTADISTICA_DIR.mkdir(parents=True, exist_ok=True)
 def cargar_resultados():
     resultados = []
     archivos = [
-        ("M1 - SVM", MODELOS_DIR / "resultados_m1_svm.csv"),
-        ("M2 - Random Forest", MODELOS_DIR / "resultados_m2_random_forest.csv"),
-        ("M3 - KNN", MODELOS_DIR / "resultados_m3_knn.csv"),
-        ("H1 - CNN+SVM", MODELOS_DIR / "resultados_h1_cnn_svm.csv"),
-        ("H2 - MobileNetV2+RF", MODELOS_DIR / "resultados_h2_transfer_rf.csv"),
+        ("M1 - SVM", M1_SVM_REPORTS_DIR / "resultados_m1_svm.csv"),
+        ("M2 - Random Forest", M2_RF_REPORTS_DIR / "resultados_m2_random_forest.csv"),
+        ("M3 - KNN", M3_KNN_REPORTS_DIR / "resultados_m3_knn.csv"),
+        ("H1 - CNN+SVM", H1_CNN_SVM_REPORTS_DIR / "resultados_h1_cnn_svm.csv"),
+        ("H2 - MobileNetV2+RF", H2_TRANSFER_RF_REPORTS_DIR / "resultados_h2_transfer_rf.csv"),
     ]
     for nombre, archivo in archivos:
         if archivo.exists():
@@ -170,16 +174,17 @@ def seleccionar_mejor(df_metricas, df_cv):
                     "balanced_accuracy", "puntaje_compuesto", "puntaje_final"]
     ranking_cols = [c for c in ranking_cols if c in df.columns]
     df_ranking = df[ranking_cols]
-    df_ranking.to_csv(MODELOS_DIR / "ranking_modelos.csv", index=False)
-    print(f"\n  ✅ Ranking guardado: {MODELOS_DIR / 'ranking_modelos.csv'}")
+    COMPARATIVOS_DIR.mkdir(parents=True, exist_ok=True)
+    df_ranking.to_csv(COMPARATIVOS_DIR / "ranking_modelos.csv", index=False)
+    print(f"\n  ✅ Ranking guardado: {COMPARATIVOS_DIR / 'ranking_modelos.csv'}")
 
     mejor_texto = f"""Mejor modelo seleccionado: {mejor['modelo']}
 Justificación:
 {chr(10).join(justificacion_puntos)}
 """
-    with open(MODELOS_DIR / "mejor_modelo.txt", "w", encoding="utf-8") as f:
+    with open(COMPARATIVOS_DIR / "mejor_modelo.txt", "w", encoding="utf-8") as f:
         f.write(mejor_texto)
-    print(f"  ✅ Mejor modelo guardado: {MODELOS_DIR / 'mejor_modelo.txt'}")
+    print(f"  ✅ Mejor modelo guardado: {COMPARATIVOS_DIR / 'mejor_modelo.txt'}")
 
     # Graficar comparación
     fig, axes = plt.subplots(1, 3, figsize=(14, 4))
@@ -202,9 +207,9 @@ Justificación:
 
     plt.suptitle("Comparación de Métricas por Modelo", fontweight="bold")
     plt.tight_layout()
-    fig.savefig(MODELOS_DIR / "comparacion_metricas_modelos.png", dpi=130, bbox_inches="tight")
+    fig.savefig(COMPARATIVOS_DIR / "comparacion_metricas_modelos.png", dpi=130, bbox_inches="tight")
     plt.close(fig)
-    print(f"  ✅ Gráfico guardado: {MODELOS_DIR / 'comparacion_metricas_modelos.png'}")
+    print(f"  ✅ Gráfico guardado: {COMPARATIVOS_DIR / 'comparacion_metricas_modelos.png'}")
 
     return mejor
 

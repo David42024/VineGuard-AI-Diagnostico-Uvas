@@ -43,3 +43,11 @@ CNN_SVM_PATH = MODELS_DIR / "cnn_svm_model.pkl"
 
 TRANSFER_EXTRACTOR_PATH = MODELS_DIR / "transfer_feature_extractor.h5"
 TRANSFER_RF_PATH = MODELS_DIR / "transfer_random_forest_model.pkl"
+
+# ─── Directorios de reportes por modelo ────────────────────────────────
+M1_SVM_REPORTS_DIR = MODELOS_DIR / "m1_svm"
+M2_RF_REPORTS_DIR = MODELOS_DIR / "m2_random_forest"
+M3_KNN_REPORTS_DIR = MODELOS_DIR / "m3_knn"
+H1_CNN_SVM_REPORTS_DIR = MODELOS_DIR / "h1_cnn_svm"
+H2_TRANSFER_RF_REPORTS_DIR = MODELOS_DIR / "h2_transfer_rf"
+COMPARATIVOS_DIR = MODELOS_DIR / "comparativos"

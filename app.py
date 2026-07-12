@@ -36,6 +36,19 @@ try:
     HAS_JOBLIB = True
 except ImportError:
     HAS_JOBLIB = False
+try:
+    from docx import Document
+    from docx.shared import Inches, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    HAS_DOCX = True
+except ImportError:
+    HAS_DOCX = False
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    HAS_XLSX = True
+except ImportError:
+    HAS_XLSX = False
 
 # Agregar src/ al path para importar extract_features
 _SRC_PATH = Path(__file__).resolve().parent / "src"
@@ -104,10 +117,20 @@ TRANSLATIONS = {
         'preventive_measures': '🛡️ Medidas Preventivas',
         'generate_report': '📄 Generar Reporte',
         'download_pdf': '📥 Descargar Reporte PDF',
+        'download_word': '📥 Descargar Reporte Word',
+        'download_excel': '📥 Descargar Reporte Excel',
         'generating_report': 'Generando reporte...',
         'download_pdf_button': '💾 Descargar PDF',
+        'download_word_button': '💾 Descargar Word',
+        'download_excel_button': '💾 Descargar Excel',
         'camera_info': '📸 La función de cámara requiere acceso al hardware del dispositivo',
         'camera_warning': 'Por favor, usa la opción de subir imagen por ahora',
+        'login_title': '🔐 Iniciar Sesión',
+        'username': 'Usuario',
+        'password': 'Contraseña',
+        'login_button': 'Entrar',
+        'login_error': 'Usuario o contraseña incorrectos',
+        'logout': 'Cerrar Sesión',
         'disease_classes': {
             'Black_rot': 'Podredumbre Negra',
             'Esca': 'Esca (Sarampión Negro)', 
@@ -174,10 +197,20 @@ TRANSLATIONS = {
         'preventive_measures': '🛡️ Preventive Measures',
         'generate_report': '📄 Generate Report',
         'download_pdf': '📥 Download PDF Report',
+        'download_word': '📥 Download Word Report',
+        'download_excel': '📥 Download Excel Report',
         'generating_report': 'Generating report...',
         'download_pdf_button': '💾 Download PDF',
+        'download_word_button': '💾 Download Word',
+        'download_excel_button': '💾 Download Excel',
         'camera_info': '📸 Camera function requires device hardware access',
         'camera_warning': 'Please use the upload image option for now',
+        'login_title': '🔐 Login',
+        'username': 'Username',
+        'password': 'Password',
+        'login_button': 'Login',
+        'login_error': 'Incorrect username or password',
+        'logout': 'Logout',
         'disease_classes': {
             'Black_rot': 'Black Rot',
             'Esca': 'Esca (Black Measles)', 
@@ -244,10 +277,20 @@ TRANSLATIONS = {
         'preventive_measures': '🛡️ Medidas Preventivas',
         'generate_report': '📄 Gerar Relatório',
         'download_pdf': '📥 Baixar Relatório PDF',
+        'download_word': '📥 Baixar Relatório Word',
+        'download_excel': '📥 Baixar Relatório Excel',
         'generating_report': 'Gerando relatório...',
         'download_pdf_button': '💾 Baixar PDF',
+        'download_word_button': '💾 Baixar Word',
+        'download_excel_button': '💾 Baixar Excel',
         'camera_info': '📸 A função da câmera requer acesso ao hardware do dispositivo',
         'camera_warning': 'Por favor, use a opção de carregar imagem por enquanto',
+        'login_title': '🔐 Iniciar Sessão',
+        'username': 'Usuário',
+        'password': 'Senha',
+        'login_button': 'Entrar',
+        'login_error': 'Usuário ou senha incorretos',
+        'logout': 'Sair',
         'disease_classes': {
             'Black_rot': 'Podridão Negra',
             'Esca': 'Esca (Sarampo Negro)', 
@@ -808,6 +851,8 @@ def check_pipeline_status():
     return results
 
 # Inicializar estado de sesión
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 if 'models_loaded' not in st.session_state:
     st.session_state.models_loaded = False
     st.session_state.models = {}
@@ -819,6 +864,39 @@ if 'models_loaded' not in st.session_state:
     st.session_state.ranking_data, st.session_state.best_model_name = load_model_ranking()
     st.session_state.pdf_bytes = None
     st.session_state.pdf_ready = False
+    st.session_state.docx_bytes = None
+    st.session_state.docx_ready = False
+    st.session_state.xlsx_bytes = None
+    st.session_state.xlsx_ready = False
+
+# Credenciales de usuario (puedes modificar estas)
+VALID_CREDENTIALS = {
+    "admin": "admin123",
+    "usuario": "12345"
+}
+
+# Mostrar pantalla de login si no está autenticado
+if not st.session_state.logged_in:
+    st.markdown("<h1 style='text-align: center; color: #4a148c;'>" + get_text('title', st.session_state.language) + "</h1>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #2e7d32;'>" + get_text('login_title', st.session_state.language) + "</h2>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        username = st.text_input(get_text('username', st.session_state.language))
+        password = st.text_input(get_text('password', st.session_state.language), type='password')
+        if st.button(get_text('login_button', st.session_state.language), use_container_width=True):
+            if username in VALID_CREDENTIALS and VALID_CREDENTIALS[username] == password:
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error(get_text('login_error', st.session_state.language))
+    
+    st.stop()
+
+# Botón de cerrar sesión
+if st.sidebar.button(get_text('logout', st.session_state.language)):
+    st.session_state.logged_in = False
+    st.rerun()
 
 # ─── Carga de modelos ────────────────────────────────────────────────────────
 @st.cache_resource
@@ -1805,6 +1883,158 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
         if os.path.exists(pdf_filename):
             os.unlink(pdf_filename)
 
+# ======= FUNCIÓN WORD =======
+def generate_diagnosis_docx(image, results, consensus_disease):
+    """Genera un reporte Word del diagnóstico"""
+    current_language = st.session_state.language
+    recommendations = get_treatment_recommendations(consensus_disease, current_language)
+    
+    # Crear documento
+    doc = Document()
+    
+    # Título
+    title = doc.add_heading(get_text('title', current_language), 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Subtítulo
+    if current_language == 'en':
+        subtitle = 'Vineyard Disease Diagnosis Report'
+    elif current_language == 'pt':
+        subtitle = 'Relatório de Diagnóstico de Doenças em Vinhedos'
+    else:
+        subtitle = 'Reporte de Diagnóstico de Enfermedades en Viñedos'
+    doc.add_heading(subtitle, level=1)
+    
+    # Información del reporte
+    date_label = 'Date:' if current_language == 'en' else 'Data:' if current_language == 'pt' else 'Fecha:'
+    doc.add_paragraph(f'{date_label} {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    
+    doc.add_heading('Diagnóstico Principal', level=2)
+    doc.add_paragraph(f'{get_disease_names(current_language)[consensus_disease]}')
+    
+    # Resultados por modelo
+    doc.add_heading('Resultados por Modelo', level=2)
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Modelo'
+    hdr_cells[1].text = 'Diagnóstico'
+    hdr_cells[2].text = 'Confianza'
+    hdr_cells[3].text = 'Tiempo (ms)'
+    
+    for result in results:
+        row_cells = table.add_row().cells
+        row_cells[0].text = result['model_name']
+        row_cells[1].text = get_disease_names(current_language)[result['predicted_class']]
+        row_cells[2].text = f'{result["confidence"]:.1%}'
+        row_cells[3].text = f'{result["inference_time"]:.0f}'
+    
+    # Recomendaciones
+    if recommendations:
+        doc.add_heading('Recomendaciones', level=2)
+        doc.add_heading('Gravedad', level=3)
+        doc.add_paragraph(recommendations.get('gravedad', 'N/A'))
+        doc.add_heading('Tratamiento', level=3)
+        for item in recommendations.get('tratamiento', []):
+            doc.add_paragraph(item, style='List Bullet')
+        doc.add_heading('Prevención', level=3)
+        for item in recommendations.get('prevencion', []):
+            doc.add_paragraph(item, style='List Bullet')
+    
+    # Guardar documento
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
+        doc.save(tmp_file.name)
+        docx_filename = tmp_file.name
+    
+    try:
+        with open(docx_filename, 'rb') as f:
+            docx_bytes = f.read()
+        return docx_bytes
+    finally:
+        if os.path.exists(docx_filename):
+            os.unlink(docx_filename)
+
+# ======= FUNCIÓN EXCEL =======
+def generate_diagnosis_xlsx(image, results, consensus_disease):
+    """Genera un reporte Excel del diagnóstico"""
+    current_language = st.session_state.language
+    recommendations = get_treatment_recommendations(consensus_disease, current_language)
+    
+    # Crear libro de Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte"
+    
+    # Estilos
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="2E8B57", end_color="2E8B57", fill_type="solid")
+    center_alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Título
+    ws['A1'] = get_text('title', current_language)
+    ws.merge_cells('A1:D1')
+    cell = ws['A1']
+    cell.font = Font(bold=True, size=16, color="2E8B57")
+    cell.alignment = center_alignment
+    
+    # Fecha
+    date_label = 'Date:' if current_language == 'en' else 'Data:' if current_language == 'pt' else 'Fecha:'
+    ws['A2'] = f'{date_label} {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+    ws.merge_cells('A2:D2')
+    
+    # Diagnóstico principal
+    ws['A4'] = 'Diagnóstico Principal:'
+    ws['A4'].font = header_font
+    ws['A4'].fill = header_fill
+    ws.merge_cells('A4:B4')
+    ws['C4'] = get_disease_names(current_language)[consensus_disease]
+    ws.merge_cells('C4:D4')
+    
+    # Resultados por modelo
+    ws['A6'] = 'Resultados por Modelo'
+    ws['A6'].font = header_font
+    ws['A6'].fill = header_fill
+    ws.merge_cells('A6:D6')
+    
+    headers = ['Modelo', 'Diagnóstico', 'Confianza', 'Tiempo (ms)']
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=7, column=col_num, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_alignment
+    
+    for row_num, result in enumerate(results, 8):
+        ws.cell(row=row_num, column=1, value=result['model_name'])
+        ws.cell(row=row_num, column=2, value=get_disease_names(current_language)[result['predicted_class']])
+        ws.cell(row=row_num, column=3, value=f'{result["confidence"]:.1%}')
+        ws.cell(row=row_num, column=4, value=f'{result["inference_time"]:.0f}')
+    
+    # Ajustar ancho de columnas
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[column].width = adjusted_width
+    
+    # Guardar Excel
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+        wb.save(tmp_file.name)
+        xlsx_filename = tmp_file.name
+    
+    try:
+        with open(xlsx_filename, 'rb') as f:
+            xlsx_bytes = f.read()
+        return xlsx_bytes
+    finally:
+        if os.path.exists(xlsx_filename):
+            os.unlink(xlsx_filename)
+
 # INTERFAZ PRINCIPAL
 def main():
     # Título y descripción
@@ -2237,25 +2467,66 @@ def main():
                                 st.caption(model_label)
                                 st.image(str(f), use_column_width=True)
 
-                    # Botón para generar reporte
+                    # Botones para generar reportes
                     st.subheader(get_text('generate_report', st.session_state.language))
-                    if st.button(get_text('download_pdf', st.session_state.language)):
-                        with st.spinner(get_text('generating_report', st.session_state.language)):
-                            st.session_state.pdf_bytes = generate_diagnosis_pdf(
-                                image,
-                                st.session_state.predictions,
-                                consensus
-                            )
-                            st.session_state.pdf_ready = True
-                        st.rerun()
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        if st.button(get_text('download_pdf', st.session_state.language)):
+                            with st.spinner(get_text('generating_report', st.session_state.language)):
+                                st.session_state.pdf_bytes = generate_diagnosis_pdf(
+                                    image,
+                                    st.session_state.predictions,
+                                    consensus
+                                )
+                                st.session_state.pdf_ready = True
+                            st.rerun()
+                    with col2:
+                        if st.button(get_text('download_word', st.session_state.language)):
+                            with st.spinner(get_text('generating_report', st.session_state.language)):
+                                st.session_state.docx_bytes = generate_diagnosis_docx(
+                                    image,
+                                    st.session_state.predictions,
+                                    consensus
+                                )
+                                st.session_state.docx_ready = True
+                            st.rerun()
+                    with col3:
+                        if st.button(get_text('download_excel', st.session_state.language)):
+                            with st.spinner(get_text('generating_report', st.session_state.language)):
+                                st.session_state.xlsx_bytes = generate_diagnosis_xlsx(
+                                    image,
+                                    st.session_state.predictions,
+                                    consensus
+                                )
+                                st.session_state.xlsx_ready = True
+                            st.rerun()
 
-                    if st.session_state.get("pdf_ready") and st.session_state.get("pdf_bytes"):
-                        st.download_button(
-                            label=get_text('download_pdf_button', st.session_state.language),
-                            data=st.session_state.pdf_bytes,
-                            file_name=f"diagnostico_vineguard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf"
-                        )
+                    # Botones de descarga
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        if st.session_state.get("pdf_ready") and st.session_state.get("pdf_bytes"):
+                            st.download_button(
+                                label=get_text('download_pdf_button', st.session_state.language),
+                                data=st.session_state.pdf_bytes,
+                                file_name=f"diagnostico_vineguard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf"
+                            )
+                    with col2:
+                        if st.session_state.get("docx_ready") and st.session_state.get("docx_bytes"):
+                            st.download_button(
+                                label=get_text('download_word_button', st.session_state.language),
+                                data=st.session_state.docx_bytes,
+                                file_name=f"diagnostico_vineguard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                    with col3:
+                        if st.session_state.get("xlsx_ready") and st.session_state.get("xlsx_bytes"):
+                            st.download_button(
+                                label=get_text('download_excel_button', st.session_state.language),
+                                data=st.session_state.xlsx_bytes,
+                                file_name=f"diagnostico_vineguard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
 
         else:  # Usar cámara
             st.info(get_text('camera_info', st.session_state.language))
