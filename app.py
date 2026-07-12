@@ -44,9 +44,12 @@ if str(_SRC_PATH) not in sys.path:
 
 try:
     from extract_features import extract_single_image_features
+    from mantenedor import SVM_SCALER_PATH, KNN_SCALER_PATH
     HAS_EXTRACT = True
 except ImportError:
     HAS_EXTRACT = False
+    SVM_SCALER_PATH = None
+    KNN_SCALER_PATH = None
 
 # ======= CONFIGURACIÓN MULTIIDIOMA =======
 TRANSLATIONS = {
@@ -863,14 +866,22 @@ def load_models():
 
 # ─── Preprocesamiento por tipo de modelo ────────────────────────────────────
 
-def preprocess_for_classic(image):
+def preprocess_for_classic(image, model_name=None):
     """
     Para modelos clásicos (SVM, RF, KNN):
-    Extrae características manuales con extract_features.py y aplica el scaler.
+    Extrae características manuales con extract_features.py y aplica el scaler
+    CORRESPONDIENTE al modelo (cada uno fue entrenado con su propio scaler,
+    o sin scaler en el caso de Random Forest).
     Retorna array numpy (1, n_features).
     """
     if HAS_EXTRACT:
-        return extract_single_image_features(image)
+        if model_name == "M1 - SVM" and SVM_SCALER_PATH is not None:
+            return extract_single_image_features(image, apply_scaler=True, scaler_path=SVM_SCALER_PATH)
+        elif model_name == "M3 - KNN" and KNN_SCALER_PATH is not None:
+            return extract_single_image_features(image, apply_scaler=True, scaler_path=KNN_SCALER_PATH)
+        elif model_name == "M2 - Random Forest":
+            return extract_single_image_features(image, apply_scaler=False)
+        return extract_single_image_features(image, apply_scaler=False)
     # Fallback sin scikit-image: histograma + estadísticas RGB planas
     img = image.resize((224, 224))
     arr = np.array(img, dtype=np.float32)
@@ -934,7 +945,7 @@ def predict_disease(image, model_bundle, model_name):
 
     if model_type == "classic":
         # ── M1, M2, M3: características manuales ───────────────────────────
-        feats = preprocess_for_classic(image)           # (1, n_features)
+        feats = preprocess_for_classic(image, model_name)   # (1, n_features)
         clf = model_bundle["clf"]
         proba = clf.predict_proba(feats)[0]             # (n_classes,)
 
@@ -1661,44 +1672,49 @@ def generate_diagnosis_pdf(image, results, consensus_disease):
             confusion_training_title = 'Confusion Matrix and Training Data' if current_language == 'en' else 'Matriz de Confusão e Dados de Treinamento' if current_language == 'pt' else 'Matriz de Confusión y Datos de Entrenamiento'
             fig.text(0.5, 0.95, confusion_training_title, fontsize=16, fontweight='bold', ha='center')
 
-            # Matriz de confusión simulada
             ax_matrix = fig.add_subplot(2, 1, 1)
 
-            # Crear matriz de confusión realista
-            np.random.seed(42)
-            confusion_matrix_data = np.array([
-                [145, 3, 2, 1],     # Black_rot
-                [2, 148, 1, 1],     # Esca
-                [1, 1, 147, 2],     # Healthy
-                [2, 1, 1, 149]      # Leaf_blight
-            ])
+            cm_csv_map = {
+                "M1 - SVM": "confusion_m1_svm.csv",
+                "M2 - Random Forest": "confusion_m2_random_forest.csv",
+                "M3 - KNN": "confusion_m3_knn.csv",
+                "H1 - CNN + SVM": "confusion_h1_cnn_svm.csv",
+                "H2 - Transfer + RF": "confusion_h2_transfer_rf.csv",  # nombre debe coincidir EXACTO con MODELS_CONFIG
+            }
+            cm_filename = cm_csv_map.get(best_result["model_name"])
+            cm_path = Path("reports/modelos") / cm_filename if cm_filename else None
+            cm_is_real = cm_path is not None and cm_path.is_file()
+            if cm_is_real:
+                confusion_matrix_data = pd.read_csv(cm_path, index_col=0).values
+            else:
+                confusion_matrix_data = np.identity(len(DISEASE_CLASSES), dtype=int)
 
             im = ax_matrix.imshow(confusion_matrix_data, interpolation='nearest', cmap='Blues')
             
-            # Título de matriz traducido
             confusion_matrix_title = f'Confusion Matrix - {best_result["model_name"]}' if current_language == 'en' else f'Matriz de Confusão - {best_result["model_name"]}' if current_language == 'pt' else f'Matriz de Confusión - {best_result["model_name"]}'
-            ax_matrix.set_title(confusion_matrix_title, fontweight='bold', pad=20)
+            if not cm_is_real:
+                no_data_note = ' (sin datos de test disponibles)' if current_language != 'en' else ' (test data not available)'
+                confusion_matrix_title += no_data_note
+            ax_matrix.set_title(confusion_matrix_title, fontweight='bold', pad=20, fontsize=11)
 
-            # Configurar etiquetas con nombres traducidos
             class_names_translated = [get_disease_names(current_language)[cls] for cls in DISEASE_CLASSES]
             ax_matrix.set_xticks(range(len(class_names_translated)))
             ax_matrix.set_yticks(range(len(class_names_translated)))
             ax_matrix.set_xticklabels(class_names_translated)
             ax_matrix.set_yticklabels(class_names_translated)
             
-            # Etiquetas de ejes traducidas
             prediction_label = 'Prediction' if current_language == 'en' else 'Predição' if current_language == 'pt' else 'Predicción'
             actual_label = 'Actual' if current_language == 'en' else 'Real' if current_language == 'pt' else 'Real'
             
             ax_matrix.set_xlabel(prediction_label, fontweight='bold')
             ax_matrix.set_ylabel(actual_label, fontweight='bold')
 
-            # Añadir números en cada celda
+            vmax = confusion_matrix_data.max()
             for i in range(len(class_names_translated)):
                 for j in range(len(class_names_translated)):
                     text = ax_matrix.text(j, i, confusion_matrix_data[i, j],
                                           ha="center", va="center",
-                                          color="white" if confusion_matrix_data[i, j] > 100 else "black",
+                                          color="white" if confusion_matrix_data[i, j] > vmax * 0.5 else "black",
                                           fontweight='bold')
 
             # Tabla de entrenamiento

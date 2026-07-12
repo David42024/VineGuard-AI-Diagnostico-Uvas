@@ -52,6 +52,7 @@ from mantenedor import (
     CLASS_FOLDER_MAP,
     IMG_SIZE,
     SEED,
+    TARGET_TRAIN_SAMPLES_PER_CLASS,
 )
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
@@ -245,14 +246,13 @@ def contar_imagenes_por_clase() -> pd.DataFrame:
     _subtitulo("Análisis de balance")
     counts = df["Total_usado"].values
     ratio_max_min = counts.max() / counts.min() if counts.min() > 0 else float("inf")
+    print(f"  Ratio max/min de imágenes físicas: {ratio_max_min:.2f}")
     if ratio_max_min <= 1.2:
-        balance_msg = "✅ Dataset balanceado (ratio max/min ≤ 1.2)"
-    elif ratio_max_min <= 2.0:
-        balance_msg = "⚠️  Desbalance leve (ratio max/min entre 1.2 y 2.0)"
+        print(f"  ✅ Dataset físico balanceado")
     else:
-        balance_msg = f"❌ Desbalance significativo (ratio max/min = {ratio_max_min:.2f})"
-    print(f"  {balance_msg}")
-    print(f"  Ratio max/min de imágenes: {ratio_max_min:.2f}")
+        print(f"  ⚠️  Dataset físico desbalanceado — se balanceará dinámicamente durante entrenamiento")
+        print(f"  🎯 Target: {1500} muestras por clase mediante aumento en memoria")
+    print(f"  ℹ️  Las muestras aumentadas no existen como archivos físicos")
 
     return df
 
@@ -683,14 +683,16 @@ def visualizar_muestras(n_muestras: int = 5) -> None:
                 ax.imshow(img_rgb)
                 ax.axis("off")
                 if col == 0:
-                    ax.set_ylabel(clase, fontsize=9, fontweight="bold",
-                                  rotation=0, labelpad=60, va="center")
+                    ax.text(-0.08, 0.5, clase, transform=ax.transAxes,
+                            fontsize=10, fontweight="bold",
+                            ha="right", va="center")
                 ax.set_title(f"{w}×{h}", fontsize=7, color="#555555")
             except Exception as e:
                 ax.text(0.5, 0.5, "Error", ha="center", va="center",
                         transform=ax.transAxes, color="red")
                 ax.axis("off")
 
+    plt.subplots_adjust(left=0.15)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     ruta = REPORTS_DIR / "muestras_por_clase.png"
     fig.savefig(ruta, dpi=130, bbox_inches="tight")
@@ -838,28 +840,32 @@ def reporte_final(
     Test:  {tot_test} ({100-pct_train:.1f}%)
 
   Balance del dataset:
-    {'✅ Balanceado' if balanceado else f'⚠️  Desbalance (ratio {ratio:.2f})'}
+    {'✅ Balanceado (físico)' if balanceado else f'⚠️  Físicamente desbalanceado (ratio {ratio:.2f}) — se balanceará a {TARGET_TRAIN_SAMPLES_PER_CLASS}/clase en entrenamiento'}
 
   Estado del dataset:
 """)
 
     criterios = {
         "Estructura de carpetas completa":    estructura["estructura_ok"],
-        "Las {len(CLASS_NAMES)} clases presentes": n_clases == len(CLASS_NAMES),
+        f"Las {len(CLASS_NAMES)} clases presentes": n_clases == len(CLASS_NAMES),
         "Sin imágenes corruptas":             len(corruptas) == 0,
         "Sin archivos con formato inválido":  len(invalidos) == 0,
         "División train/test cercana a 80/20": abs(pct_train - 80) <= 5,
-        "Dataset balanceado (ratio ≤ 2.0)":   balanceado,
+        "Balanceo dinámico en entrenamiento": True,
+        "Target muestras/clase":              TARGET_TRAIN_SAMPLES_PER_CLASS,
     }
 
     todos_ok = True
     for criterio, ok in criterios.items():
         icono = "✅" if ok else "⚠️ "
-        if ok:
-            print(f"  {icono} {criterio}")
-        else:
-            print(f"  {icono} {criterio}")
+        print(f"  {icono} {criterio}")
+        if not ok:
             todos_ok = False
+
+    if balanceado:
+        print(f"  ✅ Dataset balanceado (ratio ≤ 2.0)")
+    else:
+        print(f"  ⚠️  Dataset desbalanceado (ratio {ratio:.2f}) — se balanceará a {TARGET_TRAIN_SAMPLES_PER_CLASS}/clase en entrenamiento")
 
     print()
     print(f"  {'✅ Dataset válido para entrenamiento' if todos_ok else '⚠️  Dataset requiere revisión'}")

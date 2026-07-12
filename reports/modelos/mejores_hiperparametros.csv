@@ -1,5 +1,0 @@
-modelo,mejores_parametros,mejor_score_cv
-M1 - SVM,"{'C': 0.1, 'gamma': 'scale', 'kernel': 'linear'}",0.955
-M2 - Random Forest,"{'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 300}",0.9183
-M3 - KNN,"{'metric': 'manhattan', 'n_neighbors': 3, 'weights': 'uniform'}",0.9317
-H2 - Transfer + RF,"{'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 300}",0.9183

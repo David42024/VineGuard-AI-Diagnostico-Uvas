@@ -62,18 +62,19 @@ class DataAugmenter:
     def zoom(self, img: Image.Image, zoom_range: tuple = (0.85, 1.15)) -> Image.Image:
         factor = np.random.uniform(*zoom_range)
         w, h = img.size
-        nw, nh = int(w * factor), int(h * factor)
+        nw = max(1, int(w * factor))
+        nh = max(1, int(h * factor))
         if factor < 1:
+            reducida = img.resize((nw, nh), Image.Resampling.LANCZOS)
+            fondo = Image.new("RGB", (w, h), (0, 0, 0))
             left = (w - nw) // 2
             top = (h - nh) // 2
-            img = img.crop((left, top, left + nw, top + nh))
-            img = img.resize((w, h), Image.Resampling.LANCZOS)
-        else:
-            img = img.resize((nw, nh), Image.Resampling.LANCZOS)
-            left = (nw - w) // 2
-            top = (nh - h) // 2
-            img = img.crop((left, top, left + w, top + h))
-        return img
+            fondo.paste(reducida, (left, top))
+            return fondo
+        ampliada = img.resize((nw, nh), Image.Resampling.LANCZOS)
+        left = (nw - w) // 2
+        top = (nh - h) // 2
+        return ampliada.crop((left, top, left + w, top + h))
 
     def contraste(self, img: Image.Image, factor_range: tuple = (0.6, 1.4)) -> Image.Image:
         factor = np.random.uniform(*factor_range)
@@ -112,13 +113,18 @@ class DataAugmenter:
         return img
 
     def aplicar_aumentos(self, img: Image.Image) -> Image.Image:
-        img = self.rotacion(img)
-        img = self.brillo(img)
-        img = self.zoom(img)
-        img = self.contraste(img)
-        img = self.desplazamiento(img)
-        img = self.volteo_horizontal(img)
-        img = self.escalado(img)
+        if np.random.random() < 0.7:
+            img = self.rotacion(img, angle=20)
+        if np.random.random() < 0.6:
+            img = self.brillo(img, factor_range=(0.8, 1.2))
+        if np.random.random() < 0.5:
+            img = self.zoom(img, zoom_range=(0.9, 1.1))
+        if np.random.random() < 0.5:
+            img = self.contraste(img, factor_range=(0.8, 1.2))
+        if np.random.random() < 0.4:
+            img = self.desplazamiento(img, max_shift=0.05)
+        if np.random.random() < 0.5:
+            img = self.volteo_horizontal(img)
         return img
 
 
@@ -126,60 +132,82 @@ def generar_ejemplos_visuales():
     PREPROCESSING_DIR.mkdir(parents=True, exist_ok=True)
     augmenter = DataAugmenter()
 
+    clases_con_imagenes = []
     for clase in CLASS_NAMES:
         clase_dir = TRAIN_DIR / clase
         if not clase_dir.exists():
             continue
         imgs = [p for p in clase_dir.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png"}]
-        if not imgs:
-            continue
-        img_path = imgs[0]
-        original = Image.open(img_path).convert("RGB").resize(IMG_SIZE)
+        if imgs:
+            clases_con_imagenes.append((clase, imgs[0]))
 
-        # Rotacion
-        fig, axes = plt.subplots(1, 4, figsize=(12, 3))
-        fig.suptitle(f"Rotación — {clase}", fontsize=12)
-        axes[0].imshow(original)
-        axes[0].set_title("Original")
-        axes[0].axis("off")
+    if not clases_con_imagenes:
+        print("  ⚠️  No se encontraron imágenes para generar ejemplos.")
+        return
+
+    n = len(clases_con_imagenes)
+
+    # Rotacion — una fila por clase
+    fig, axes = plt.subplots(n, 4, figsize=(12, 3 * n))
+    if n == 1:
+        axes = [axes]
+    for fila, (clase, img_path) in enumerate(clases_con_imagenes):
+        original = Image.open(img_path).convert("RGB").resize(IMG_SIZE, Image.Resampling.LANCZOS)
+        axs = axes[fila]
+        axs[0].imshow(original)
+        axs[0].set_title("Original")
+        axs[0].axis("off")
         for i, ang in enumerate([15, 30, -20], 1):
             rot = original.rotate(ang, resample=Image.Resampling.BILINEAR)
-            axes[i].imshow(rot)
-            axes[i].set_title(f"Rot {ang}°")
-            axes[i].axis("off")
-        plt.tight_layout()
-        fig.savefig(PREPROCESSING_DIR / "ejemplos_rotacion.png", dpi=130, bbox_inches="tight")
-        plt.close(fig)
+            axs[i].imshow(rot)
+            axs[i].set_title(f"Rot {ang}°")
+            axs[i].axis("off")
+        axs[0].text(-0.08, 0.5, clase, transform=axs[0].transAxes,
+                    fontsize=9, fontweight="bold", ha="right", va="center")
+    plt.tight_layout()
+    fig.savefig(PREPROCESSING_DIR / "ejemplos_rotacion.png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
 
-        # Brillo
-        fig, axes = plt.subplots(1, 4, figsize=(12, 3))
-        fig.suptitle(f"Brillo — {clase}", fontsize=12)
-        axes[0].imshow(original)
-        axes[0].set_title("Original")
-        axes[0].axis("off")
+    # Brillo — una fila por clase
+    fig, axes = plt.subplots(n, 4, figsize=(12, 3 * n))
+    if n == 1:
+        axes = [axes]
+    for fila, (clase, img_path) in enumerate(clases_con_imagenes):
+        original = Image.open(img_path).convert("RGB").resize(IMG_SIZE, Image.Resampling.LANCZOS)
+        axs = axes[fila]
+        axs[0].imshow(original)
+        axs[0].set_title("Original")
+        axs[0].axis("off")
         for i, fac in enumerate([0.6, 1.0, 1.4], 1):
             arr = np.array(original, dtype=np.float32) * fac
             arr = np.clip(arr, 0, 255).astype(np.uint8)
-            axes[i].imshow(arr)
-            axes[i].set_title(f"Factor {fac}")
-            axes[i].axis("off")
-        plt.tight_layout()
-        fig.savefig(PREPROCESSING_DIR / "ejemplos_brillo.png", dpi=130, bbox_inches="tight")
-        plt.close(fig)
+            axs[i].imshow(arr)
+            axs[i].set_title(f"Factor {fac}")
+            axs[i].axis("off")
+        axs[0].text(-0.08, 0.5, clase, transform=axs[0].transAxes,
+                    fontsize=9, fontweight="bold", ha="right", va="center")
+    plt.tight_layout()
+    fig.savefig(PREPROCESSING_DIR / "ejemplos_brillo.png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
 
-        # Aumento completo
-        fig, axes = plt.subplots(2, 4, figsize=(14, 6))
-        fig.suptitle(f"Aumento de Datos — {clase}", fontsize=12)
-        for i in range(8):
-            ax = axes[i // 4][i % 4]
+    # Aumento completo — una fila por clase
+    fig, axes = plt.subplots(n, 4, figsize=(14, 3 * n))
+    if n == 1:
+        axes = [axes]
+    for fila, (clase, img_path) in enumerate(clases_con_imagenes):
+        original = Image.open(img_path).convert("RGB").resize(IMG_SIZE, Image.Resampling.LANCZOS)
+        axs = axes[fila]
+        for i in range(4):
             aug = augmenter.aplicar_aumentos(original)
-            ax.imshow(aug)
-            ax.set_title(f"Aumento {i+1}")
-            ax.axis("off")
-        plt.tight_layout()
-        fig.savefig(PREPROCESSING_DIR / "ejemplos_aumento_datos.png", dpi=130, bbox_inches="tight")
-        plt.close(fig)
-        break
+            axs[i].imshow(aug)
+            if fila == 0:
+                axs[i].set_title(f"Aumento {i+1}")
+            axs[i].axis("off")
+        axs[0].text(-0.08, 0.5, clase, transform=axs[0].transAxes,
+                    fontsize=9, fontweight="bold", ha="right", va="center")
+    plt.tight_layout()
+    fig.savefig(PREPROCESSING_DIR / "ejemplos_aumento_datos.png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
 
     print(f"  Ejemplos visuales guardados en: {PREPROCESSING_DIR}")
 

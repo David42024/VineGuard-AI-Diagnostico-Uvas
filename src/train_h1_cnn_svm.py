@@ -33,6 +33,8 @@ NUM_CLASSES = len(CLASS_NAMES)
 EPOCHS_CNN = 20
 VAL_RATIO = 0.15
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+TARGET_PER_CLASS = 1500
+STEPS_PER_EPOCH = (NUM_CLASSES * TARGET_PER_CLASS) // BATCH_SIZE
 
 
 def escanear_directorio(split_dir: Path):
@@ -47,11 +49,22 @@ def escanear_directorio(split_dir: Path):
     return paths, labels
 
 
+def agrupar_rutas_por_clase(paths, labels):
+    resultado = {
+        clase: {"idx": idx, "rutas": []}
+        for idx, clase in enumerate(CLASS_NAMES)
+    }
+    for path, label in zip(paths, labels):
+        clase = CLASS_NAMES[label]
+        resultado[clase]["rutas"].append(path)
+    return resultado
+
+
 def cargar_imagen(path, label):
     raw = tf.io.read_file(path)
     img = tf.image.decode_image(raw, channels=3, expand_animations=False)
     img = tf.image.resize(img, IMG_SIZE)
-    img = tf.cast(img, tf.float32)
+    img = tf.cast(img, tf.float32) / 255.0
     label_oh = tf.one_hot(label, NUM_CLASSES)
     return img, label_oh
 
@@ -61,6 +74,26 @@ def construir_dataset(paths, labels, shuffle=False):
     ds = ds.map(cargar_imagen, num_parallel_calls=tf.data.AUTOTUNE)
     if shuffle:
         ds = ds.shuffle(buffer_size=len(paths), seed=SEED, reshuffle_each_iteration=True)
+    ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    return ds
+
+
+def construir_dataset_balanceado(rutas_por_clase):
+    all_paths, all_labels = [], []
+    np.random.seed(SEED)
+    for clase, info in rutas_por_clase.items():
+        rutas = info["rutas"]
+        idx = info["idx"]
+        needed = TARGET_PER_CLASS
+        sampled = np.random.choice(rutas, size=needed, replace=True)
+        all_paths.extend(sampled.tolist())
+        all_labels.extend([idx] * needed)
+    perm = np.random.permutation(len(all_paths))
+    all_paths = [all_paths[i] for i in perm]
+    all_labels = [all_labels[i] for i in perm]
+    ds = tf.data.Dataset.from_tensor_slices((tf.constant(all_paths), tf.constant(all_labels, dtype=tf.int32)))
+    ds = ds.map(cargar_imagen, num_parallel_calls=tf.data.AUTOTUNE)
+    ds = ds.shuffle(buffer_size=TARGET_PER_CLASS * NUM_CLASSES, seed=SEED, reshuffle_each_iteration=True)
     ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
     return ds
 
@@ -76,7 +109,6 @@ def construir_cnn():
     model = keras_models.Sequential([
         layers.Input(shape=IMG_SIZE + (3,)),
         data_aug,
-        layers.Rescaling(1.0 / 255),
         layers.Conv2D(32, 3, activation="relu", padding="same"),
         layers.BatchNormalization(),
         layers.MaxPooling2D(),
@@ -134,6 +166,12 @@ def mostrar_metricas(y_test, y_pred, nombre_modelo="CNN + SVM", tiempo_entrenami
     print("=" * 60)
 
     MODELOS_DIR.mkdir(parents=True, exist_ok=True)
+    reporte = classification_report(y_test, y_pred, target_names=CLASS_NAMES, zero_division=0, output_dict=True)
+    reporte_df = pd.DataFrame(reporte).transpose()
+    ruta_reporte = MODELOS_DIR / "reporte_clasificacion_h1_cnn_svm.csv"
+    reporte_df.to_csv(ruta_reporte)
+    print(f"  Reporte por clase guardado: {ruta_reporte}")
+
     cm_df = pd.DataFrame(cm, index=CLASS_NAMES, columns=CLASS_NAMES)
     cm_df.to_csv(MODELOS_DIR / "confusion_h1_cnn_svm.csv")
 
@@ -143,8 +181,9 @@ def mostrar_metricas(y_test, y_pred, nombre_modelo="CNN + SVM", tiempo_entrenami
         "mcc": round(mcc, 4), "tiempo_entrenamiento_s": round(tiempo_entrenamiento, 2),
         "tiempo_inferencia_ms": round(tiempo_inferencia, 2)
     }])
-    resumen.to_csv(MODELOS_DIR / "resultados_h1_cnn_svm.csv", index=False)
-    print(f"  Métricas guardadas en reports/modelos/")
+    ruta_resumen = MODELOS_DIR / "resultados_h1_cnn_svm.csv"
+    resumen.to_csv(ruta_resumen, index=False)
+    print(f"  Métricas generales guardadas: {ruta_resumen}")
     return acc, prec, rec, f1, mcc, bal_acc, cm
 
 
@@ -160,18 +199,45 @@ def main():
     start_total = time.time()
 
     print("\n🔄 Escaneando directorios...")
-    all_train_paths, all_train_labels = escanear_directorio(TRAIN_DIR)
+    all_paths, all_labels = escanear_directorio(TRAIN_DIR)
     test_paths, test_labels = escanear_directorio(TEST_DIR)
 
+    # Split real images → train(85%) / val(15%) stratified
     train_paths, val_paths, train_labels, val_labels = train_test_split(
-        all_train_paths, all_train_labels, test_size=VAL_RATIO,
-        stratify=all_train_labels, random_state=SEED,
+        all_paths, all_labels, test_size=VAL_RATIO,
+        stratify=all_labels, random_state=SEED,
     )
 
+    # Mostrar tabla de balanceo (train split only)
+    rutas_train_por_clase = agrupar_rutas_por_clase(train_paths, train_labels)
+    target = TARGET_PER_CLASS
+    total_reales = 0
+    total_aumentos = 0
+    print("=" * 49)
+    print(f"  {'Clase':<18} {'Reales':>8} {'Aumentos':>9} {'Total':>6}")
+    print(f"  {'─'*47}")
+    for clase, info in rutas_train_por_clase.items():
+        n = len(info["rutas"])
+        falta = max(0, target - n)
+        total_reales += n
+        total_aumentos += falta
+        print(f"  {clase:<18} {n:>8} {falta:>9} {target:>6}")
+    total_efectivo = total_reales + total_aumentos
+    print(f"  {'─'*47}")
+    print(f"  {'TOTAL':<18} {total_reales:>8} {total_aumentos:>9} {total_efectivo:>6}")
+    print()
+
     print("\n🔄 Construyendo tf.data.Datasets...")
-    train_ds = construir_dataset(train_paths, train_labels, shuffle=True)
+    train_ds = construir_dataset_balanceado(rutas_train_por_clase)
     val_ds = construir_dataset(val_paths, val_labels, shuffle=False)
     test_ds = construir_dataset(test_paths, test_labels, shuffle=False)
+
+    print("\n📋 Preprocesamiento:")
+    print("   - Entrenamiento: RGB + redimensionamiento + normalización + aumento dinámico (keras layers)")
+    print(f"   - Entrenamiento balanceado a {target} muestras/clase/época (oversampling con reemplazo)")
+    print("   - Validación:    RGB + redimensionamiento + normalización (solo imágenes reales)")
+    print("   - Prueba:        RGB + redimensionamiento + normalización (solo imágenes reales)")
+    print("   - Imágenes aumentadas guardadas físicamente: No")
 
     print(f"\n🚀 Entrenando CNN ({EPOCHS_CNN} épocas)...")
     cnn = construir_cnn()
@@ -183,7 +249,8 @@ def main():
         tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6),
     ]
 
-    history = cnn.fit(train_ds, validation_data=val_ds, epochs=EPOCHS_CNN, callbacks=callbacks)
+    history = cnn.fit(train_ds, validation_data=val_ds, epochs=EPOCHS_CNN, callbacks=callbacks,
+                      steps_per_epoch=STEPS_PER_EPOCH)
 
     best_val_acc = max(history.history.get("val_accuracy", [0]))
     print(f"\n   ✅ Mejor val_accuracy: {best_val_acc:.4f}")
@@ -193,16 +260,13 @@ def main():
     extractor.save(str(CNN_EXTRACTOR_PATH))
     print(f"   Extractor guardado: {CNN_EXTRACTOR_PATH}")
 
-    print("\n🔍 Extrayendo features para SVM...")
-    X_train_fit, y_train_fit = extraer_features_tf(extractor, train_ds)
-    X_val, y_val = extraer_features_tf(extractor, val_ds)
-    X_train_svm = np.concatenate([X_train_fit, X_val], axis=0)
-    y_train_svm = np.concatenate([y_train_fit, y_val], axis=0)
+    print("\n🔍 Extrayendo features para SVM desde imágenes reales (train+val)...")
+    train_full_ds = construir_dataset(all_paths, all_labels, shuffle=False)
+    X_train_svm, y_train_svm = extraer_features_tf(extractor, train_full_ds)
     X_test, y_test = extraer_features_tf(extractor, test_ds)
 
     print(f"   X_train_svm: {X_train_svm.shape}, X_test: {X_test.shape}")
 
-    start_train = time.time()
     print("\n🚀 Entrenando SVM sobre features CNN...")
     svm = SVC(kernel="rbf", C=10.0, gamma="scale", probability=True, class_weight="balanced", random_state=SEED)
     svm.fit(X_train_svm, y_train_svm)

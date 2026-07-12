@@ -1,2 +1,0 @@
-modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,tiempo_entrenamiento_s,tiempo_inferencia_ms
-"M3 — KNN (k=5, euclidiana)",0.9417,0.9417,0.9419,0.9417,0.9409,0.9228,0.0,4.85

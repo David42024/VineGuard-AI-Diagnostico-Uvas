@@ -19,7 +19,8 @@ IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
 SEED = 42
 
-MAX_IMAGES_PER_CLASS = 150
+MAX_IMAGES_PER_CLASS = None
+TARGET_TRAIN_SAMPLES_PER_CLASS = 1500
 
 CLASS_NAMES = ["Black_rot", "Esca", "Healthy", "Leaf_blight"]
 
@@ -31,6 +32,8 @@ CLASS_FOLDER_MAP = {
 }
 
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
+SVM_SCALER_PATH = MODELS_DIR / "svm_scaler.pkl"
+KNN_SCALER_PATH = MODELS_DIR / "knn_scaler.pkl"
 SVM_MODEL_PATH = MODELS_DIR / "svm_model.pkl"
 RF_MODEL_PATH = MODELS_DIR / "random_forest_model.pkl"
 KNN_MODEL_PATH = MODELS_DIR / "knn_model.pkl"

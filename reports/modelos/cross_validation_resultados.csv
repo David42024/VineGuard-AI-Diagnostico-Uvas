@@ -1,6 +1,0 @@
-modelo,accuracy_mean,accuracy_std,f1_mean,f1_std,mcc_mean,mcc_std
-M1 - SVM,0.9567,0.0082,0.957,0.0079,0.943,0.011
-M2 - Random Forest,0.9317,0.0255,0.9317,0.0253,0.9095,0.0332
-M3 - KNN,0.9217,0.0135,0.9212,0.0141,0.8969,0.017
-H1 - CNN+SVM,,,,,,
-H2 - MobileNetV2+RF,,,,,,

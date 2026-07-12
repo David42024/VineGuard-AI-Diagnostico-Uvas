@@ -1,14 +1,14 @@
 estadistica,valor
-Total imágenes,600
+Total imágenes,4062
 Número de clases,4
-Media por clase,150.0
-Desviación estándar,0.0
-Mínimo,150
-Máximo,150
-Q1 (25%),150.0
-Mediana (Q2),150.0
-Q3 (75%),150.0
-Rango,0
-Rango intercuartílico (IQR),0.0
-Porcentaje clase mayoritaria,25.0
-Porcentaje clase minoritaria,25.0
+Media por clase,1015.5
+Desviación estándar,415.06
+Mínimo,423
+Máximo,1383
+Q1 (25%),912.75
+Mediana (Q2),1128.0
+Q3 (75%),1230.75
+Rango,960
+Rango intercuartílico (IQR),318.0
+Porcentaje clase mayoritaria,34.05
+Porcentaje clase minoritaria,10.41
