@@ -10,13 +10,7 @@ dataset_original/
 *.zip
 *.tar.gz
 
-# Modelos entrenados y pesados
-models/
-*.h5
-*.npy
-*.png
-*.jpg
-*.jpeg
+
 
 # Python cache y compilados
 __pycache__/
@@ -42,6 +36,4 @@ models y dataset_original.rar
 *.rar
 dataset_original/
 dataset/
-models/
-*.h5
-*.keras
+
