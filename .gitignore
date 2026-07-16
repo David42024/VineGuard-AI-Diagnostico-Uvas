@@ -28,12 +28,17 @@ DiagnosticoUvasNModelos.ipynb
 .streamlit/
 *.pdf
 
+# Entorno local
+.env
+backend/.env
+
 # Archivos del sistema operativo
 .DS_Store
-Thumbs.dbmodels y dataset_original.rar
-*.rar
-models y dataset_original.rar
-*.rar
-dataset_original/
-dataset/
+Thumbs.db
 
+# Backup DB
+data/*.bak.*
+
+
+venv_api
+venv_ml

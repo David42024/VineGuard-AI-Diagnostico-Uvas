@@ -1,0 +1,22 @@
+// Re-export all canonical types from the single source of truth
+export type {
+  User,
+  TokenResponse,
+  UserUpdate,
+  PredictionDetail,
+  ConsensusInfo,
+  DiagnosisResponse,
+  DiagnosisListItem,
+  PaginatedDiagnoses,
+  ModelInfo,
+  ModelMetrics,
+  ModelRanking,
+  BestModelResponse,
+  ModelTestResponse,
+  ReportItem,
+  ReportListResponse,
+  ReportGenerateResponse,
+  GeneralStats,
+  SummaryResponse,
+  ApiError,
+} from "./api";

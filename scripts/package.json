@@ -1,0 +1,13 @@
+{
+  "name": "vinguard-db-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DEPRECATED: Use python scripts/seed_db.py and alembic for schema management.",
+  "scripts": {
+    "init": "node init.mjs",
+    "reset": "node reset.mjs",
+    "seed": "node seed.mjs",
+    "setup": "echo '[DEPRECATED] Use: alembic upgrade head && python scripts/seed_db.py'"
+  }
+}

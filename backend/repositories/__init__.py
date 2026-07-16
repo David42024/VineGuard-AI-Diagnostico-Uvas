@@ -1,0 +1,5 @@
+from backend.repositories.user_repository import UserRepository
+from backend.repositories.diagnostic_repository import DiagnosticRepository
+from backend.repositories.audit_repository import AuditRepository
+from backend.repositories.model_repository import ModelRepository
+from backend.repositories.report_repository import ReportRepository
