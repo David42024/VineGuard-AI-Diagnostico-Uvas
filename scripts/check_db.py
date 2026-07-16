@@ -22,9 +22,9 @@ def main():
         print(f"  Modelos:      {models}")
         print()
         if users == 0:
-        print("[WARN] DB vacia — ejecuta: python scripts/seed_db.py")
-    else:
-        print("[OK] DB ok")
+            print("[WARN] DB vacia — ejecuta: python scripts/seed_db.py")
+        else:
+            print("[OK] DB ok")
     finally:
         db.close()
 

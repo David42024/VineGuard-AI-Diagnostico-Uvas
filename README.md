@@ -1,55 +1,130 @@
-# VineGuard AI — Sistema de Diagnóstico de Enfermedades en Hojas de Uva
+# VineGuard AI — Diagnóstico Inteligente de Enfermedades en Hojas de Vid
 
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](#)
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](#)
+[![Streamlit](https://img.shields.io/badge/Streamlit-AI%20Lab-ff4b4b)](#)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688)](#)
+[![Next.js](https://img.shields.io/badge/Next.js-Frontend-black)](#)
+[![React](https://img.shields.io/badge/React-18-61dafb)](#)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38bdf8)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](#)
-[![Streamlit](https://img.shields.io/badge/Streamlit-App-orange)](#)
 
-**VineGuard AI** es una plataforma de inteligencia artificial para la detección temprana y precisa de enfermedades foliares en vid. Implementa **modelos clásicos**, **modelos híbridos** y **redes neuronales profundas (CNN)** con validación estadística robusta (McNemar, Matthews, Bootstrap).
+**VineGuard AI** es una plataforma de inteligencia artificial para la detección temprana de enfermedades foliares en vid. Integra modelos clásicos, modelos híbridos y redes neuronales, junto con validación cruzada, optimización de hiperparámetros, pruebas estadísticas robustas y generación de reportes.
 
----
+El sistema utiliza una arquitectura separada por responsabilidades:
 
-## Características
-
-- **5 modelos integrados** en pipeline: SVM, Random Forest, KNN (clásicos), CNN+SVM y MobileNetV2+RF (híbridos)
-- **Modelos deep learning adicionales**: DenseNet121, CNN desde cero, MobileNetV2 fine-tuning, EfficientNetB0
-- **App Streamlit multiidioma** (Español, English, Português) con inicio de sesión
-- **Modo oscuro/claro** con botón de alternancia clickeable (🌙/☀️)
-- **Diagnóstico por consenso** entre modelos disponibles
-- **Validación estadística**: Coeficiente de Matthews (MCC), prueba de McNemar, Cochran Q, Bootstrap estratificado
-- **Reportes descargables** en PDF, Word (.docx) y Excel (.xlsx)
-- **Ranking de modelos** con puntaje compuesto ponderado
-- **Panel de estado del pipeline** (EDA, preprocesamiento, CV, tuning, selección)
+- **Streamlit AI Lab:** ejecución y visualización del pipeline de Machine Learning.
+- **FastAPI:** autenticación, diagnósticos, acceso a modelos, estadísticas y reportes.
+- **Next.js:** aplicación web final para administradores y clientes.
 
 ---
 
-## Requerimientos
+## Características principales
 
-### Hardware
-| Componente | Mínimo | Recomendado |
-|------------|--------|-------------|
-| RAM | 8 GB | 16 GB |
-| Almacenamiento | 5 GB | 10 GB |
-| GPU | — | NVIDIA CUDA 8 GB+ |
-| CPU | 4 núcleos | 8 núcleos |
+- Cinco modelos integrados:
+  - M1 — SVM
+  - M2 — Random Forest
+  - M3 — KNN
+  - H1 — CNN + SVM
+  - H2 — MobileNetV2 + Random Forest
+- Diagnóstico individual y por consenso.
+- Lectura y validación del dataset.
+- Análisis exploratorio de datos.
+- Preprocesamiento y aumento de imágenes.
+- Validación cruzada configurable.
+- Optimización de hiperparámetros.
+- Pruebas estadísticas robustas.
+- Selección automática del mejor modelo.
+- Persistencia de modelos en `.h5` y `.pkl`.
+- Historial de diagnósticos en SQLite.
+- Reportes en CSV, PNG, DOCX, PDF y XLSX.
+- Autenticación con roles administrador y cliente.
+- Interfaz bilingüe español/inglés.
+- Modo claro y oscuro.
+- Chatbot de ayuda por texto y voz.
+- Frontend moderno con Next.js, React y Tailwind CSS.
 
-### Software
-- Python 3.10 – 3.11 (3.12+ no compatible con TensorFlow 2.13)
-- TensorFlow 2.13
-- CUDA Toolkit 11.8 + cuDNN 8.6 (solo GPU)
+---
 
-### Instalación
-```bash
-python -m venv venv
-venv\Scripts\activate    # Windows
-pip install -r requirements.txt
+## Arquitectura
+
+```text
+                          ┌──────────────────────────┐
+                          │     Streamlit AI Lab     │
+                          │ EDA, entrenamiento, CV,  │
+                          │ tuning y estadística     │
+                          └────────────┬─────────────┘
+                                       │
+                                       ▼
+                             ┌──────────────────────┐
+                             │ models/ + reports/  │
+                             │ .h5, .pkl, CSV, PNG │
+                             └──────────┬───────────┘
+                                        │
+                                        ▼
+                             ┌──────────────────────┐
+                             │       FastAPI        │
+                             │ Auth, diagnóstico,   │
+                             │ modelos y reportes   │
+                             └──────────┬───────────┘
+                                        │ HTTP / JSON
+                                        ▼
+                             ┌──────────────────────┐
+                             │ Next.js + React      │
+                             │ Aplicación final     │
+                             └──────────────────────┘
+
+                             ┌──────────────────────┐
+                             │ SQLite              │
+                             │ users, diagnostics, │
+                             │ audit_log           │
+                             └──────────────────────┘
 ```
+
+La descripción completa se encuentra en [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
+---
+
+## Persistencia
+
+VineGuard AI utiliza dos mecanismos de persistencia separados.
+
+### SQLite
+
+Archivo:
+
+```text
+data/vinguard.db
+```
+
+Tablas principales:
+
+| Tabla | Contenido |
+|---|---|
+| `users` | Cuentas, roles, contraseñas y último acceso |
+| `diagnostics` | Resultado, confianza, modelo usado y fecha |
+| `audit_log` | Accesos y acciones |
+| `models` | Metadatos básicos opcionales |
+
+### Artefactos de Machine Learning
+
+| Ruta | Contenido |
+|---|---|
+| `models/*.pkl` | Clasificadores clásicos e híbridos |
+| `models/*.h5` | Extractores CNN y modelos Keras |
+| `reports/modelos/` | Métricas, ranking, CV y tuning |
+| `reports/estadistica/` | McNemar, Cochran-Q, Bootstrap y tamaños de efecto |
+| `reports/eda/` | Resultados del análisis exploratorio |
+| `reports/preprocessing/` | Ejemplos de aumento de datos |
+
+> SQLite no almacena los pesos entrenados ni los resultados completos del pipeline.
 
 ---
 
 ## Dataset
 
-Estructura esperada en `dataset_original/`:
-```
+Estructura esperada:
+
+```text
 dataset_original/
 ├── Grape___Black_rot/
 ├── Grape___Esca_(Black_Measles)/
@@ -57,229 +132,384 @@ dataset_original/
 └── Grape___Leaf_blight_(Isariopsis_Leaf_Spot)/
 ```
 
-| Clase | Enfermedad |
-|-------|-----------|
-| `Black_rot` | Podredumbre negra (*Guignardia bidwellii*) |
-| `Esca` | Esca / Sarampión negro |
+Clases utilizadas:
+
+| Clase | Descripción |
+|---|---|
+| `Black_rot` | Podredumbre negra |
+| `Esca` | Esca o sarampión negro |
 | `Healthy` | Hoja sana |
-| `Leaf_blight` | Tizón de la hoja (*Pseudocercospora vitis*) |
+| `Leaf_blight` | Tizón de la hoja |
+
+La preparación genera una división estratificada:
+
+```text
+dataset/
+├── train/
+└── test/
+```
 
 ---
 
-## Modelos Implementados
+## Modelos implementados
 
-### Pipeline principal (5 modelos)
+| ID | Modelo | Tipo | Artefactos |
+|---|---|---|---|
+| `M1` | SVM | Clásico | `svm_model.pkl`, `svm_scaler.pkl` |
+| `M2` | Random Forest | Clásico | `random_forest_model.pkl` |
+| `M3` | KNN | Clásico | `knn_model.pkl`, `knn_scaler.pkl` |
+| `H1` | CNN + SVM | Híbrido | `cnn_feature_extractor.h5`, `h1_svm_classifier.pkl` |
+| `H2` | MobileNetV2 + RF | Híbrido | `transfer_feature_extractor.h5`, `transfer_random_forest_model.pkl` |
 
-#### Clásicos (características manuales: HSV + LBP + RGB stats)
-| ID | Modelo | Parámetros |
-|----|--------|-----------|
-| M1 | SVM | Kernel RBF, C=10, class_weight='balanced' |
-| M2 | Random Forest | 200 árboles, class_weight='balanced' |
-| M3 | KNN | k=5, euclidiana, weights='distance' |
+El modelo H1 está compuesto por dos archivos:
 
-#### Híbridos (extractor profundo + clasificador clásico)
-| ID | Extractor | Clasificador |
-|----|-----------|-------------|
-| H1 | CNN (Conv2D 32→64→128 → Dense 256) | SVM RBF |
-| H2 | MobileNetV2 (ImageNet, 1280 dims) | Random Forest |
-
-### Modelos adicionales (standalone)
-| Script | Arquitectura | Approach |
-|--------|-------------|----------|
-| `train_model_1_cnn.py` | CNN desde cero (Conv+Pool → Dense) | End-to-end |
-| `train_model_2_mobilenet.py` | MobileNetV2 transfer learning | Fine-tuning |
-| `train_model_3_efficientnetb0_fixed.py` | EfficientNetB0 transfer learning | Fine-tuning |
-| `train_densenet121.py` | DenseNet121 transfer learning | Fine-tuning |
+```text
+Extractor CNN (.h5) + Clasificador SVM (.pkl)
+```
 
 ---
 
-## Flujo de Trabajo
+## Pipeline de Machine Learning
 
-Ejecutar en orden desde la raíz del proyecto:
+Ejecutar desde la raíz del proyecto:
 
 ```bash
-# PASO 1 — Preparar dataset (80% train / 20% test)
+# 1. Preparar dataset
 python src/prepare_dataset.py
 
-# PASO 2 — Análisis Exploratorio (EDA)
+# 2. Análisis exploratorio
 python src/eda_validacion_datos.py
 
-# PASO 3 — Preprocesamiento y aumento de datos
+# 3. Preprocesamiento y aumento
 python src/preprocesamiento_aumento.py
 
-# PASO 4 — Entrenamiento (5 modelos)
+# 4. Entrenamiento
 python src/train_m1_svm.py
 python src/train_m2_random_forest.py
 python src/train_m3_knn.py
 python src/train_h1_cnn_svm.py
 python src/train_h2_transfer_random_forest.py
 
-# PASO 5 — Validación cruzada (5 folds, StratifiedKFold)
+# 5. Validación cruzada
 python src/cross_validation_modelos.py
 
-# PASO 6 — Optimización de hiperparámetros (GridSearchCV)
+# 6. Optimización de hiperparámetros
 python src/optimizacion_hiperparametros.py
 
-# PASO 7 — Validación estadística (McNemar, Cochran Q, Bootstrap)
+# 7. Validación estadística
 python src/validacion_estadistica_modelos.py
 
-# PASO 8 — Comparación y selección del mejor modelo
+# 8. Comparación y selección
 python src/comparacion_general_modelos.py
 python src/seleccion_mejor_modelo.py
 python src/evaluacion_comparativa.py
+```
 
-# PASO 9 — Lanzar la aplicación web
+---
+
+## Pruebas estadísticas
+
+| Prueba | Propósito |
+|---|---|
+| MCC | Medir desempeño multiclase |
+| Cochran Q | Comparar globalmente los modelos |
+| McNemar | Comparación por pares |
+| McNemar + Holm | Comparaciones múltiples corregidas |
+| Bootstrap estratificado | Intervalos de confianza |
+| Tamaño del efecto | Magnitud de diferencias |
+| Odds Ratio | Comparación relativa de errores |
+
+---
+
+## Requisitos
+
+### Software
+
+- Python 3.11
+- Node.js 20 o superior
+- npm 10 o superior
+- TensorFlow 2.13
+- scikit-learn 1.3
+- SQLite
+- Git
+
+### Hardware recomendado
+
+| Componente | Mínimo | Recomendado |
+|---|---:|---:|
+| RAM | 8 GB | 16 GB |
+| Almacenamiento | 5 GB | 10 GB |
+| CPU | 4 núcleos | 8 núcleos |
+| GPU | No obligatoria | NVIDIA con CUDA |
+
+---
+
+## Instalación
+
+## 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/David42024/VineGuard-AI-Diagnostico-Uvas.git
+cd VineGuard-AI-Diagnostico-Uvas
+```
+
+## 2. Configurar Python
+
+### Windows
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Linux o macOS
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## 3. Configurar variables de entorno
+
+Crear un archivo `.env` en la raíz:
+
+```env
+SECRET_KEY=change-this-secret-key
+DATABASE_URL=sqlite:///./data/vinguard.db
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+```
+
+Para el frontend, crear `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+---
+
+## Ejecución local
+
+## Streamlit AI Lab
+
+```bash
 streamlit run app.py
 ```
 
-Credenciales: `admin` / `admin123` o `usuario` / `12345`
+Disponible normalmente en:
 
----
-
-## App Web (Streamlit)
-
-### Pestañas
-- **🔍 Diagnóstico**: Sube una imagen y obtén diagnóstico individual o por consenso
-- **📊 Análisis Estadístico**: MCC, McNemar, Bootstrap sobre tu propio dataset
-- **🔬 Validación McNemar**: Validación emparejada entre modelos
-- **📚 Información**: Documentación del sistema
-
-### Reportes
-- PDF con portada, diagnósticos, matriz de confusión, recomendaciones
-- Word (.docx) con tabla de resultados y recomendaciones
-- Excel (.xlsx) con datos estructurados
-
-### Temas
-- Alternancia instantánea entre **modo oscuro** y **modo claro** desde el botón en la barra lateral o en la pantalla de inicio de sesión.
-
-## Arquitectura del Frontend
-
-El frontend está modularizado en `ui/` para facilitar el mantenimiento:
-
-| Módulo | Propósito |
-|--------|-----------|
-| `ui/theme.py` | CSS variables y estilos para modo oscuro/claro |
-| `ui/components.py` | Componentes reutilizables (tarjetas, badges, stepper) |
-| `ui/auth.py` | Pantalla de inicio de sesión con roles |
-| `ui/layout.py` | Barra lateral, navegación por pestañas, encabezado |
-| `ui/admin_dashboard.py` | Dashboard ejecutivo para admins |
-| `ui/client_dashboard.py` | Inicio simplificado para clientes |
-| `ui/diagnosis_view.py` | Flujo completo de diagnóstico (cargar → analizar → resultado) |
-| `ui/history_view.py` | Historial de diagnósticos con SQLite |
-| `ui/models_view.py` | Gestión y comparación de modelos |
-| `ui/pipeline_view.py` | Estado del pipeline experimental |
-| `ui/statistics_view.py` | Validación estadística (MCC, McNemar, Bootstrap) |
-| `ui/reports_view.py` | Visualización y descarga de reportes |
-| `ui/info_view.py` | Información educativa para clientes |
-
-La persistencia se maneja mediante SQLite en `database/repository.py`, preparado para migrar a PostgreSQL.
-
----
-
-## Estructura del Repositorio
-
+```text
+http://localhost:8501
 ```
+
+## FastAPI
+
+```bash
+uvicorn backend.main:app --reload
+```
+
+Disponible normalmente en:
+
+```text
+http://localhost:8000
+```
+
+Documentación Swagger:
+
+```text
+http://localhost:8000/docs
+```
+
+## Next.js
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Disponible normalmente en:
+
+```text
+http://localhost:3000
+```
+
+---
+
+## Credenciales de demostración
+
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `admin` | `admin123` | Administrador |
+| `usuario` | `12345` | Cliente |
+
+> Cambiar estas credenciales antes de cualquier despliegue público.
+
+---
+
+## Flujo de diagnóstico
+
+```text
+Usuario sube una imagen
+        ↓
+Next.js envía FormData a FastAPI
+        ↓
+FastAPI valida JWT
+        ↓
+FastAPI carga el modelo seleccionado
+        ↓
+Se realiza la inferencia
+        ↓
+El resultado se guarda en SQLite
+        ↓
+FastAPI devuelve JSON
+        ↓
+Next.js muestra el diagnóstico
+```
+
+Ejemplo de respuesta:
+
+```json
+{
+  "id": 35,
+  "result": "Black_rot",
+  "confidence": 0.9421,
+  "model_used": "H1",
+  "probabilities": {
+    "Black_rot": 0.9421,
+    "Esca": 0.0312,
+    "Healthy": 0.0104,
+    "Leaf_blight": 0.0163
+  }
+}
+```
+
+---
+
+## Endpoints principales
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/v1/auth/login` | Iniciar sesión |
+| `GET` | `/api/v1/auth/me` | Obtener usuario actual |
+| `POST` | `/api/v1/diagnoses` | Crear diagnóstico |
+| `GET` | `/api/v1/diagnoses` | Listar diagnósticos |
+| `GET` | `/api/v1/models` | Listar modelos |
+| `GET` | `/api/v1/models/ranking` | Obtener ranking |
+| `GET` | `/api/v1/models/best` | Obtener mejor modelo |
+| `GET` | `/api/v1/pipeline/status` | Estado del pipeline |
+| `GET` | `/api/v1/statistics/summary` | Resumen estadístico |
+| `GET` | `/api/v1/reports` | Listar reportes |
+| `GET` | `/api/v1/users` | Listar usuarios |
+
+---
+
+## Estructura del repositorio
+
+```text
 VineGuard-AI/
-├── dataset_original/       # Imágenes crudas (4 clases)
-│   ├── Grape___Black_rot/
-│   ├── Grape___Esca_(Black_Measles)/
-│   ├── Grape___healthy/
-│   └── Grape___Leaf_blight_(Isariopsis_Leaf_Spot)/
-├── dataset/                # Dataset procesado (train/test 80/20)
-│   ├── train/
-│   └── test/
-├── models/                 # Modelos entrenados
-│   ├── modelo_final/       # Mejor modelo (H1) en formato listo para producción
-│   ├── svm_model.pkl
-│   ├── random_forest_model.pkl
-│   ├── knn_model.pkl / knn_scaler.pkl
-│   ├── cnn_feature_extractor.h5 / cnn_svm_model.pkl
-│   ├── transfer_feature_extractor.h5 / transfer_random_forest_model.pkl
-│   └── ...
-├── reports/
-│   ├── eda/                # Estadísticas, gráficos, validación
-│   ├── preprocessing/      # Ejemplos de aumento de datos
-│   ├── modelos/            # Métricas por modelo, CV, tuning, ranking
-│   │   ├── m1_svm/
-│   │   ├── m2_random_forest/
-│   │   ├── m3_knn/
-│   │   ├── h1_cnn_svm/
-│   │   ├── h2_transfer_rf/
-│   │   ├── cross_validation/
-│   │   ├── tuning/
-│   │   ├── comparativos/
-│   │   ├── ranking_modelos.csv
-│   │   └── mejor_modelo.txt
-│   └── estadistica/        # McNemar, Cochran Q, Bootstrap
-├── src/                    # Módulos y scripts
-│   ├── mantenedor.py       # Constantes, rutas, configuración central
+├── app.py
+├── ARCHITECTURE.md
+├── backend/
+│   ├── main.py
+│   ├── api/
+│   ├── core/
+│   ├── database/
+│   └── schemas/
+├── frontend/
+│   └── src/
+│       ├── app/
+│       ├── components/
+│       ├── lib/
+│       ├── store/
+│       └── i18n/
+├── database/
+│   └── repository.py
+├── scripts/
+├── src/
+│   ├── services/
+│   ├── mantenedor.py
+│   ├── predecir_imagen.py
 │   ├── prepare_dataset.py
 │   ├── eda_validacion_datos.py
 │   ├── preprocesamiento_aumento.py
-│   ├── extract_features.py
-│   ├── preprocesamiento_h2.py
-│   ├── predecir_imagen.py  # Motor de predicción (app + CLI)
 │   ├── train_m1_svm.py
 │   ├── train_m2_random_forest.py
 │   ├── train_m3_knn.py
 │   ├── train_h1_cnn_svm.py
 │   ├── train_h2_transfer_random_forest.py
-│   ├── train_densenet121.py
-│   ├── train_model_1_cnn.py
-│   ├── train_model_2_mobilenet.py
-│   ├── train_model_3_efficientnetb0_fixed.py
 │   ├── cross_validation_modelos.py
 │   ├── optimizacion_hiperparametros.py
 │   ├── validacion_estadistica_modelos.py
-│   ├── comparacion_general_modelos.py
-│   ├── seleccion_mejor_modelo.py
-│   ├── evaluacion_comparativa.py
-│   └── evaluacion_visual.py
-├── app.py                  # Punto de entrada (orquestador de módulos)
-├── ui/                     # Módulos de interfaz de usuario
-│   ├── __init__.py
-│   ├── theme.py            # Sistema de temas (oscuro/claro)
-│   ├── components.py       # Componentes reutilizables
-│   ├── auth.py             # Autenticación y login
-│   ├── layout.py           # Barra lateral, navegación, encabezado
-│   ├── admin_dashboard.py  # Dashboard administrativo
-│   ├── client_dashboard.py # Dashboard del cliente
-│   ├── diagnosis_view.py   # Flujo de diagnóstico
-│   ├── history_view.py     # Historial de diagnósticos
-│   ├── models_view.py      # Gestión de modelos
-│   ├── pipeline_view.py    # Estado del pipeline
-│   ├── statistics_view.py  # Estadísticas y validación
-│   ├── reports_view.py     # Reportes
-│   └── info_view.py        # Información educativa
-├── database/               # Capa de persistencia
-│   ├── __init__.py
-│   └── repository.py       # SQLite (preparado para migración a PostgreSQL)
-├── data/                   # Base de datos SQLite (generada automáticamente)
+│   └── seleccion_mejor_modelo.py
+├── ui/
+├── data/
+│   └── vinguard.db
+├── models/
+├── reports/
+├── dataset/
+├── dataset_original/
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Validación Estadística
+## Despliegue
 
-| Prueba | Propósito |
-|--------|----------|
-| **McNemar** (exploratorio) | Comparación por pares de modelos |
-| **Cochran Q** (global) | Determina si hay diferencias globales entre modelos |
-| **McNemar + Holm** (post-hoc) | Comparaciones múltiples con corrección (solo si Cochran Q significativo) |
-| **Bootstrap estratificado** | IC 95% para Accuracy, F1, MCC |
-| **Tamaño del efecto** | Diferencia de métricas y Odds Ratio |
-| **Matthews (MCC)** | Coeficiente de correlación multiclase |
+| Componente | Plataforma recomendada |
+|---|---|
+| Streamlit AI Lab | Render |
+| FastAPI | Render |
+| Next.js | Vercel |
+| Código fuente | GitHub |
+| Documentación y seguimiento | Jira |
+
+### Streamlit en Render
+
+```bash
+streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+```
+
+### FastAPI en Render
+
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+```
+
+### Next.js en Vercel
+
+```env
+NEXT_PUBLIC_API_URL=https://vinguard-api.onrender.com/api/v1
+```
+
+> SQLite debe usar almacenamiento persistente en Render para evitar la pérdida de usuarios y diagnósticos.
 
 ---
 
-## Referencias
+## Backups
 
-1. PlantVillage Grapevine Disease Dataset — Kaggle
-2. MobileNetV2: Inverted Residuals and Linear Bottlenecks — CVPR 2018
-3. DenseNet: Densely Connected Convolutional Networks — CVPR 2017
-4. EfficientNet: Rethinking Model Scaling — ICML 2019
-5. Matthews Correlation Coefficient — Biochimica et Biophysica Acta, 1975
-6. McNemar Test — Psychometrika, 1947
-7. Cochran Q Test — Biometrika, 1950
+Respaldar:
+
+```text
+data/vinguard.db
+models/
+reports/
+```
+
+- `data/vinguard.db`: usuarios, diagnósticos y auditoría.
+- `models/`: artefactos entrenados.
+- `reports/`: métricas, gráficos y resultados.
+
+---
+
+## Licencia
+
+Este proyecto se distribuye bajo la licencia MIT.
+
+---
+
+## Autores
+
+Proyecto académico desarrollado para la implementación de un sistema inteligente de diagnóstico de enfermedades en hojas de vid.
