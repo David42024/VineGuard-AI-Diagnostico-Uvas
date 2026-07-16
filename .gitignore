@@ -3,6 +3,8 @@ venv/
 .venv/
 env/
 ENV/
+venv_api/
+venv_ml/
 
 # Datasets e Imágenes
 dataset/
@@ -10,7 +12,12 @@ dataset_original/
 *.zip
 *.tar.gz
 
-
+# Datos generados por la app (no guardar en Git)
+data/vinguard.db
+data/vinguard.db-shm
+data/vinguard.db-wal
+data/uploads/
+data/generated_reports/
 
 # Python cache y compilados
 __pycache__/
@@ -38,7 +45,3 @@ Thumbs.db
 
 # Backup DB
 data/*.bak.*
-
-
-venv_api
-venv_ml

@@ -65,7 +65,7 @@ export default function DiagnosisPage() {
       formData.append("file", file);
       formData.append("model_key", modelKey);
 
-      const response = await api.post<Diagnosis>("/diagnosis", formData, {
+      const response = await api.post<Diagnosis>("/diagnoses", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setResult(response.data);
@@ -80,8 +80,44 @@ export default function DiagnosisPage() {
     }
   };
 
-  const handleDownload = () => {
-    toast.success("Reporte descargado");
+  const [downloading, setDownloading] = useState(false);
+  type ReportFormat = "docx" | "pdf" | "xlsx";
+  const [reportFormat, setReportFormat] = useState<ReportFormat>("docx");
+
+const handleDownload = async () => {
+    if (!result) return;
+    setDownloading(true);
+
+    try {
+      const genRes = await api.post<{ download_url: string; filename: string }>(
+        `/reports/diagnosis/${result.id}`,
+        { format: reportFormat }
+      );
+
+      const origin = new URL(api.defaults.baseURL as string).origin;
+
+      const fileRes = await api.get(genRes.data.download_url, {
+        baseURL: origin,
+        responseType: "blob",
+      });
+
+      const blob = new Blob([fileRes.data]);
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = genRes.data.filename || `reporte_${result.id}.${reportFormat}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success("Reporte descargado");
+    } catch {
+      toast.error("No se pudo generar el reporte. Intenta de nuevo.");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -205,9 +241,24 @@ export default function DiagnosisPage() {
               </Card>
 
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={handleDownload}>
+                <select
+                  value={reportFormat}
+                  onChange={(e) => setReportFormat(e.target.value as ReportFormat)}
+                  className="rounded-md border px-3 py-2 text-sm"
+                >
+                  <option value="docx">Word (.docx)</option>
+                  <option value="pdf">PDF</option>
+                  <option value="xlsx">Excel (.xlsx)</option>
+                </select>
+
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                >
                   <Download className="mr-2 h-4 w-4" />
-                  Descargar Reporte
+                  {downloading ? "Generando..." : "Descargar Reporte"}
                 </Button>
                 <Button variant="outline" className="flex-1" onClick={handleRemove}>
                   <RotateCcw className="mr-2 h-4 w-4" />
