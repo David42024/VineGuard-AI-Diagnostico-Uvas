@@ -30,8 +30,8 @@ def render():
     except Exception:
         pass
 
-    ranking_data = st.session_state.get("ranking_data", [])
-    best_model_raw = st.session_state.get("best_model_name", "")
+    ranking_data = st.session_state.get("ranking_data", []) or []
+    best_model_raw = st.session_state.get("best_model_name", "") or ""
     best_model = (
         best_model_raw.split(":", 1)[1].strip()
         if ":" in best_model_raw

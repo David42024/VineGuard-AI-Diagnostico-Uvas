@@ -1,7 +1,7 @@
 clase,ap
-Black_rot,0.9844
-Esca,0.9919
-Healthy,0.9994
-Leaf_blight,0.9968
+Black_rot,0.9838
+Esca,0.9922
+Healthy,0.9995
+Leaf_blight,0.9971
 macro_promedio,0.9931
-micro_promedio,0.993
+micro_promedio,0.9933

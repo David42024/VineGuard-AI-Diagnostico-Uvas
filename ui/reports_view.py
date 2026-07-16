@@ -14,15 +14,21 @@ REPORT_DIRS = {
 }
 
 
+def _t(es: str, en: str, pt: str) -> str:
+    lang = st.session_state.get("language", "es")
+    return {"es": es, "en": en, "pt": pt}.get(lang, es)
+
+
 def render():
     lang = st.session_state.get("language", "es")
-    _t = lambda es, en, pt: {"es": es, "en": en, "pt": pt}.get(lang, es)
-
     section_header(
         _t("Reportes", "Reports", "Relatórios"),
         _t("Visualiza y descarga los reportes generados por el sistema", "View and download system-generated reports", "Visualize e baixe os relatórios gerados pelo sistema"),
         "📄",
     )
+
+    if st.button(_t("🔄 Actualizar lista de reportes", "🔄 Refresh report list", "🔄 Atualizar lista de relatórios"), key="refresh_reports"):
+        st.rerun()
 
     tabs = st.tabs([k for k in REPORT_DIRS.keys()])
 
@@ -35,8 +41,8 @@ def _render_report_dir(dir_path: Path, label: str):
     if not dir_path.exists():
         empty_state(
             "📁",
-            f"No hay reportes de {label}",
-            f"Ejecuta los scripts correspondientes para generar reportes de {label}.",
+            _t(f"No hay reportes de {label}", f"No {label} reports", f"Não há relatórios de {label}"),
+            _t(f"Ejecuta los scripts correspondientes para generar reportes de {label}.", f"Run corresponding scripts to generate {label} reports.", f"Execute os scripts correspondentes para gerar relatórios de {label}."),
         )
         return
 
@@ -46,10 +52,10 @@ def _render_report_dir(dir_path: Path, label: str):
     files = sorted(files)
 
     if not files:
-        empty_state("📄", f"No se encontraron archivos en {label}", "La carpeta está vacía.")
+        empty_state("📄", _t(f"No se encontraron archivos en {label}", f"No files found in {label}", f"Nenhum arquivo encontrado em {label}"), _t("La carpeta está vacía.", "The folder is empty.", "A pasta está vazia."))
         return
 
-    st.markdown(f"**{len(files)} archivo(s) encontrado(s)**")
+    st.markdown(f"**{len(files)} {_t('archivo(s) encontrado(s)', 'file(s) found', 'arquivo(s) encontrado(s)')}**")
 
     rows = []
     for f in files:
@@ -61,7 +67,7 @@ def _render_report_dir(dir_path: Path, label: str):
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    st.markdown("### Vista previa de imágenes")
+    st.markdown(f"### {_t('Vista previa de imágenes', 'Image preview', 'Visualização de imagens')}")
     image_files = [f for f in files if f.suffix.lower() in (".png", ".jpg", ".jpeg")]
     if image_files:
         cols = st.columns(3)
@@ -69,4 +75,4 @@ def _render_report_dir(dir_path: Path, label: str):
             with cols[i % 3]:
                 st.image(str(img_f), use_column_width=True, caption=img_f.stem)
     else:
-        info_box("No hay imágenes para mostrar en esta categoría.", "info")
+        info_box(_t("No hay imágenes para mostrar en esta categoría.", "No images to display in this category.", "Nenhuma imagem para mostrar nesta categoria."), "info")

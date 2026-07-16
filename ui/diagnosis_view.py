@@ -198,7 +198,7 @@ def render():
 
 
 def _get_available_models():
-    model_status = st.session_state.get("model_status", {})
+    model_status = st.session_state.get("model_status", {}) or {}
     return [mk for mk in MODEL_KEYS if model_status.get(mk, {}).get("disponible", False)]
 
 

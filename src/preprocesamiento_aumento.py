@@ -49,8 +49,22 @@ class DataAugmenter:
     def __init__(self, target_size: tuple = IMG_SIZE):
         self.target_size = target_size
 
-    def rotacion(self, img: Image.Image, angle: float = 30) -> Image.Image:
-        return img.rotate(np.random.uniform(-angle, angle), resample=Image.Resampling.BILINEAR)
+    def rotacion(
+        self,
+        img: Image.Image,
+        angle: float = 30,
+        fixed_angle: float | None = None,
+    ) -> Image.Image:
+        angulo = (
+            fixed_angle
+            if fixed_angle is not None
+            else np.random.uniform(-angle, angle)
+        )
+        return img.rotate(
+            angulo,
+            resample=Image.Resampling.BILINEAR,
+            fillcolor=(127, 127, 127),
+        )
 
     def brillo(self, img: Image.Image, factor_range: tuple = (0.6, 1.4)) -> Image.Image:
         factor = np.random.uniform(*factor_range)
@@ -66,7 +80,7 @@ class DataAugmenter:
         nh = max(1, int(h * factor))
         if factor < 1:
             reducida = img.resize((nw, nh), Image.Resampling.LANCZOS)
-            fondo = Image.new("RGB", (w, h), (0, 0, 0))
+            fondo = Image.new("RGB", (w, h), (127, 127, 127))
             left = (w - nw) // 2
             top = (h - nh) // 2
             fondo.paste(reducida, (left, top))
@@ -88,29 +102,16 @@ class DataAugmenter:
         w, h = img.size
         dx = int(np.random.uniform(-max_shift, max_shift) * w)
         dy = int(np.random.uniform(-max_shift, max_shift) * h)
-        return img.transform(img.size, Image.AFFINE, (1, 0, dx, 0, 1, dy), resample=Image.Resampling.BILINEAR)
+        return img.transform(
+            img.size,
+            Image.Transform.AFFINE,
+            (1, 0, dx, 0, 1, dy),
+            resample=Image.Resampling.BILINEAR,
+            fillcolor=(127, 127, 127),
+        )
 
     def volteo_horizontal(self, img: Image.Image) -> Image.Image:
-        if np.random.random() > 0.5:
-            return img.transpose(Image.FLIP_LEFT_RIGHT)
-        return img
-
-    def escalado(self, img: Image.Image, scale_range: tuple = (0.9, 1.1)) -> Image.Image:
-        factor = np.random.uniform(*scale_range)
-        w, h = img.size
-        nw, nh = int(w * factor), int(h * factor)
-        img = img.resize((nw, nh), Image.Resampling.LANCZOS)
-        if factor > 1:
-            left = (nw - w) // 2
-            top = (nh - h) // 2
-            img = img.crop((left, top, left + w, top + h))
-        else:
-            bg = Image.new("RGB", (w, h), (0, 0, 0))
-            left = (w - nw) // 2
-            top = (h - nh) // 2
-            bg.paste(img, (left, top))
-            img = bg
-        return img
+        return img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
 
     def aplicar_aumentos(self, img: Image.Image) -> Image.Image:
         if np.random.random() < 0.7:
@@ -158,7 +159,7 @@ def generar_ejemplos_visuales():
         axs[0].set_title("Original")
         axs[0].axis("off")
         for i, ang in enumerate([15, 30, -20], 1):
-            rot = original.rotate(ang, resample=Image.Resampling.BILINEAR)
+            rot = augmenter.rotacion(original, fixed_angle=ang)
             axs[i].imshow(rot)
             axs[i].set_title(f"Rot {ang}°")
             axs[i].axis("off")

@@ -57,7 +57,12 @@ from mantenedor import (
     CLASS_NAMES,
     KNN_MODEL_PATH,
     KNN_SCALER_PATH,
+    M3_KNN_ALGORITHM,
+    M3_KNN_METRIC,
+    M3_KNN_N_NEIGHBORS,
+    M3_KNN_P,
     M3_KNN_REPORTS_DIR,
+    M3_KNN_WEIGHTS,
 )
 from extract_features import load_features
 from evaluacion_visual import (
@@ -71,11 +76,6 @@ from evaluacion_visual import (
 SEMILLA = 42
 NOMBRE_MODELO = "M3 — KNN (k=5, euclidiana)"
 
-N_NEIGHBORS = 5
-METRIC = "euclidean"
-WEIGHTS = "distance"
-ALGORITHM = "auto"
-P = 2
 N_JOBS = -1
 
 
@@ -607,12 +607,12 @@ def main() -> None:
     # El fit almacena los datos de entrenamiento.
     # ─────────────────────────────────────────────
     modelo = KNeighborsClassifier(
-        n_neighbors=N_NEIGHBORS,
-        weights=WEIGHTS,
-        algorithm=ALGORITHM,
+        n_neighbors=M3_KNN_N_NEIGHBORS,
+        weights=M3_KNN_WEIGHTS,
+        algorithm=M3_KNN_ALGORITHM,
         leaf_size=30,
-        p=P,
-        metric=METRIC,
+        p=M3_KNN_P,
+        metric=M3_KNN_METRIC,
         n_jobs=N_JOBS,
     )
 

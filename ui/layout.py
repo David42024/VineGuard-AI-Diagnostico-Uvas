@@ -5,21 +5,17 @@ from ui.theme import toggle_theme
 from ui.components import user_avatar
 
 
-NAV_ITEMS_ADMIN = [
-    {"id": "dashboard", "label_es": "📊 Dashboard", "label_en": "📊 Dashboard", "label_pt": "📊 Dashboard"},
-    {"id": "diagnosis", "label_es": "🔬 Nuevo Diagnóstico", "label_en": "🔬 New Diagnosis", "label_pt": "🔬 Novo Diagnóstico"},
-    {"id": "history", "label_es": "📋 Historial", "label_en": "📋 History", "label_pt": "📋 Histórico"},
-    {"id": "models", "label_es": "🧠 Modelos", "label_en": "🧠 Models", "label_pt": "🧠 Modelos"},
-    {"id": "pipeline", "label_es": "🔧 Pipeline", "label_en": "🔧 Pipeline", "label_pt": "🔧 Pipeline"},
-    {"id": "statistics", "label_es": "📈 Estadísticas", "label_en": "📈 Statistics", "label_pt": "📈 Estatísticas"},
-    {"id": "reports", "label_es": "📄 Reportes", "label_en": "📄 Reports", "label_pt": "📄 Relatórios"},
-]
-
-NAV_ITEMS_CLIENT = [
-    {"id": "dashboard", "label_es": "📊 Inicio", "label_en": "📊 Home", "label_pt": "📊 Início"},
-    {"id": "diagnosis", "label_es": "🔬 Nuevo Diagnóstico", "label_en": "🔬 New Diagnosis", "label_pt": "🔬 Novo Diagnóstico"},
-    {"id": "history", "label_es": "📋 Mi Historial", "label_en": "📋 My History", "label_pt": "📋 Meu Histórico"},
-    {"id": "info", "label_es": "ℹ️ Información", "label_en": "ℹ️ Information", "label_pt": "ℹ️ Informação"},
+NAV_ITEMS = [
+    {"id": "pipeline",     "label_es": "🔧 Resumen del Pipeline",     "label_en": "🔧 Pipeline Summary",     "label_pt": "🔧 Resumo do Pipeline"},
+    {"id": "dataset_eda",  "label_es": "📊 Dataset y EDA",            "label_en": "📊 Dataset & EDA",          "label_pt": "📊 Dataset e EDA"},
+    {"id": "preprocessing","label_es": "🔄 Preprocesamiento",          "label_en": "🔄 Preprocessing",          "label_pt": "🔄 Pré-processamento"},
+    {"id": "training",    "label_es": "🧠 Entrenamiento",             "label_en": "🧠 Training",               "label_pt": "🧠 Treinamento"},
+    {"id": "crossval",    "label_es": "📐 Validación Cruzada",        "label_en": "📐 Cross-Validation",       "label_pt": "📐 Validação Cruzada"},
+    {"id": "hyperparams", "label_es": "⚙️ Hiperparámetros",           "label_en": "⚙️ Hyperparameters",       "label_pt": "⚙️ Hiperparâmetros"},
+    {"id": "stats_tests", "label_es": "📈 Pruebas Estadísticas",      "label_en": "📈 Statistical Tests",      "label_pt": "📈 Testes Estatísticos"},
+    {"id": "comparison",  "label_es": "🏆 Comparación de Modelos",    "label_en": "🏆 Model Comparison",       "label_pt": "🏆 Comparação de Modelos"},
+    {"id": "best_model",  "label_es": "⭐ Mejor Modelo",              "label_en": "⭐ Best Model",             "label_pt": "⭐ Melhor Modelo"},
+    {"id": "reports",     "label_es": "📄 Reportes",                  "label_en": "📄 Reports",                "label_pt": "📄 Relatórios"},
 ]
 
 
@@ -36,8 +32,8 @@ def _nav_label(item: dict) -> str:
 def render_header(page_title: str, page_subtitle: str = ""):
     user = st.session_state.get("user", {})
     name = user.get("name", "Usuario")
-    role = user.get("role", "client")
-    role_label = _t("Administrador", "Admin", "Administrador") if role == "admin" else _t("Cliente", "Client", "Cliente")
+    role = user.get("role", "admin")
+    role_label = _t("Admin", "Admin", "Admin") if role == "admin" else _t("Cliente", "Client", "Cliente")
 
     col1, col2 = st.columns([2.5, 1])
     with col1:
@@ -59,7 +55,6 @@ def render_header(page_title: str, page_subtitle: str = ""):
 
 def render_sidebar():
     user = st.session_state.get("user", {})
-    role = user.get("role", "client")
     name = user.get("name", "Usuario")
     username = st.session_state.get("username", "")
     lang = st.session_state.get("language", "es")
@@ -69,20 +64,19 @@ def render_sidebar():
         <div style="padding: 1rem 0; text-align: center;">
             <div style="font-size: 1.4rem; font-weight: 800; background: linear-gradient(135deg, var(--green-primary), var(--green-secondary));
                         -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                VineGuard AI
+                VineGuard AI Lab
             </div>
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-                {_t("Sistema de Diagnóstico", "Diagnosis System", "Sistema de Diagnóstico")}
+                {_t("Laboratorio de Machine Learning", "Machine Learning Lab", "Laboratório de Machine Learning")}
             </div>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown("---")
 
-        nav_items = NAV_ITEMS_ADMIN if role == "admin" else NAV_ITEMS_CLIENT
-        current_page = st.session_state.get("page", "dashboard")
+        current_page = st.session_state.get("page", "pipeline")
 
-        for item in nav_items:
+        for item in NAV_ITEMS:
             label = _nav_label(item)
             is_active = current_page == item["id"]
             if st.button(
@@ -116,11 +110,10 @@ def render_sidebar():
 
         st.markdown("---")
 
-        role_label = _t("Admin", "Admin", "Admin") if role == "admin" else _t("Cliente", "Client", "Cliente")
         st.markdown(f"""
         <div style="padding: 0.5rem 0; font-size: 0.85rem;">
             <div style="font-weight: 600; color: var(--text-primary);">{name}</div>
-            <div style="color: var(--text-secondary); font-size: 0.75rem;">{role_label}</div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem;">{_t("Admin", "Admin", "Admin")}</div>
         </div>
         """, unsafe_allow_html=True)
 

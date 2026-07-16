@@ -1,7 +1,7 @@
 clase,auc
 Black_rot,0.9977
-Esca,0.9972
+Esca,0.9975
 Healthy,1.0
-Leaf_blight,1.0
-macro_promedio,0.9987
+Leaf_blight,0.9999
+macro_promedio,0.9988
 micro_promedio,0.9991

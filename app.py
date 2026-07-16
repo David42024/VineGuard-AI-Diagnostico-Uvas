@@ -1,5 +1,5 @@
 """
-VineGuard AI - Sistema de Diagnóstico de Enfermedades en Uvas
+VineGuard AI Lab - Laboratorio técnico de Machine Learning
 Entry point - coordinates modules and routing.
 """
 
@@ -14,25 +14,26 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 
-# ─── UI Modules ────────────────────────────────────────────────────────────
+# --- UI Modules ---
 from ui.theme import render_theme
 from ui.auth import render_login, init_auth
 from ui.layout import render_sidebar, render_header
 
-from ui.admin_dashboard import render as admin_dashboard
-from ui.client_dashboard import render as client_dashboard
-from ui.diagnosis_view import render as diagnosis_view
-from ui.history_view import render as history_view
-from ui.models_view import render as models_view
 from ui.pipeline_view import render as pipeline_view
-from ui.statistics_view import render as statistics_view
+from ui.dataset_eda_view import render as dataset_eda_view
+from ui.preprocessing_view import render as preprocessing_view
+from ui.training_view import render as training_view
+from ui.cross_validation_view import render as cross_validation_view
+from ui.hyperparams_view import render as hyperparams_view
+from ui.statistical_tests_view import render as statistical_tests_view
+from ui.model_comparison_view import render as model_comparison_view
+from ui.best_model_view import render as best_model_view
 from ui.reports_view import render as reports_view
-from ui.info_view import render as info_view
 
-# ─── Database ──────────────────────────────────────────────────────────────
+# --- Database ---
 from database.repository import init_database
 
-# ─── Shared prediction ─────────────────────────────────────────────────────
+# --- Shared prediction ---
 from predecir_imagen import cargar_modelo
 from src.model_registry import MODEL_KEYS, MODEL_DISPLAY_NAMES
 
@@ -46,7 +47,7 @@ MODELS_DIR = Path("models")
 
 
 # ============================================================================
-# FUNCTIONS FROM PREVIOUS APP
+# FUNCTIONS
 # ============================================================================
 
 def load_model_ranking():
@@ -78,72 +79,12 @@ def load_models() -> dict[str, dict]:
     return resultados
 
 
-def check_pipeline_status():
-    checks = {
-        "eda": {
-            "label_es": "EDA - Análisis exploratorio",
-            "label_en": "EDA - Exploratory analysis",
-            "label_pt": "EDA - Análise exploratória",
-            "files": [Path("reports/eda/resumen_dataset.csv"), Path("reports/eda/distribucion_clases.png")],
-        },
-        "preprocessing": {
-            "label_es": "Preprocesamiento y aumento",
-            "label_en": "Preprocessing & augmentation",
-            "label_pt": "Pré-processamento e aumento",
-            "files": [Path("reports/preprocessing/ejemplos_aumento_datos.png")],
-        },
-        "crossval": {
-            "label_es": "Validación cruzada (5-folds)",
-            "label_en": "Cross-validation (5-fold)",
-            "label_pt": "Validação cruzada (5-fold)",
-            "files": [Path("reports/modelos/cross_validation/cross_validation_resultados.csv")],
-        },
-        "hyperparam": {
-            "label_es": "Optimización de hiperparámetros",
-            "label_en": "Hyperparameter optimization",
-            "label_pt": "Otimização de hiperparâmetros",
-            "files": [Path("reports/modelos/tuning/mejores_hiperparametros.csv")],
-        },
-        "statistical": {
-            "label_es": "Validación estadística",
-            "label_en": "Statistical validation",
-            "label_pt": "Validação estatística",
-            "files": [Path("reports/estadistica/mcnemar_resultados.csv")],
-        },
-        "model_selection": {
-            "label_es": "Selección del mejor modelo",
-            "label_en": "Best model selection",
-            "label_pt": "Seleção do melhor modelo",
-            "files": [Path("reports/modelos/ranking_modelos.csv")],
-        },
-    }
-    lang = st.session_state.get("language", "es")
-    results = {}
-    for key, check in checks.items():
-        done = all(f.exists() for f in check["files"])
-        label = check.get(f"label_{lang}", check["label_es"])
-        results[key] = {"done": done, "label": label}
-    return results
-
-
-def validar_cross_validation() -> bool:
-    archivo = Path("reports/modelos/cross_validation/cross_validation_resultados.csv")
-    if not archivo.is_file():
-        return False
-    try:
-        df = pd.read_csv(archivo)
-        columnas_requeridas = {"modelo", "accuracy_mean", "accuracy_std"}
-        return not df.empty and columnas_requeridas.issubset(df.columns) and df["accuracy_mean"].notna().any()
-    except Exception:
-        return False
-
-
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
 
 st.set_page_config(
-    page_title="VineGuard AI",
+    page_title="VineGuard AI Lab",
     page_icon="🍇",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -159,7 +100,7 @@ if "logged_in" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = None
 if "page" not in st.session_state:
-    st.session_state.page = "dashboard"
+    st.session_state.page = "pipeline"
 if "model_status" not in st.session_state:
     st.session_state.model_status = {}
 if "models_loaded" not in st.session_state:
@@ -177,10 +118,10 @@ try:
 except Exception:
     pass
 
-# ─── Render theme ──────────────────────────────────────────────────────────
+# --- Render theme ---
 render_theme()
 
-# ─── Language selector (top, before login) ─────────────────────────────────
+# --- Language selector (top, before login) ---
 lang = st.session_state.language
 col_lang1, col_lang2 = st.columns([3.5, 1.5])
 with col_lang2:
@@ -218,68 +159,115 @@ if not st.session_state.logged_in:
 render_sidebar()
 
 user = st.session_state.user
-role = user.get("role", "client") if user else "client"
-page = st.session_state.get("page", "dashboard")
+page = st.session_state.get("page", "pipeline")
 
 _t = lambda es, en, pt: {"es": es, "en": en, "pt": pt}.get(st.session_state.language, es)
 
-# ─── Page routing ──────────────────────────────────────────────────────────
+# --- Page routing ---
 
-if page == "diagnosis":
+PAGES = {
+    "pipeline": {
+        "title_es": "Resumen del Pipeline",
+        "title_en": "Pipeline Summary",
+        "title_pt": "Resumo do Pipeline",
+        "sub_es": "Estado detallado de cada etapa del flujo de Machine Learning",
+        "sub_en": "Detailed status of each ML flow stage",
+        "sub_pt": "Status detalhado de cada etapa do fluxo de ML",
+        "view": pipeline_view,
+    },
+    "dataset_eda": {
+        "title_es": "Dataset y EDA",
+        "title_en": "Dataset & EDA",
+        "title_pt": "Dataset e EDA",
+        "sub_es": "Análisis exploratorio del dataset de hojas de vid",
+        "sub_en": "Exploratory analysis of the vine leaf dataset",
+        "sub_pt": "Análise exploratória do dataset de folhas de videira",
+        "view": dataset_eda_view,
+    },
+    "preprocessing": {
+        "title_es": "Preprocesamiento",
+        "title_en": "Preprocessing",
+        "title_pt": "Pré-processamento",
+        "sub_es": "Configuración y ejemplos visuales del aumento de datos",
+        "sub_en": "Configuration and visual examples of data augmentation",
+        "sub_pt": "Configuração e exemplos visuais do aumento de dados",
+        "view": preprocessing_view,
+    },
+    "training": {
+        "title_es": "Entrenamiento",
+        "title_en": "Training",
+        "title_pt": "Treinamento",
+        "sub_es": "Estado, métricas y artefactos de los 5 modelos",
+        "sub_en": "Status, metrics and artifacts of the 5 models",
+        "sub_pt": "Status, métricas e artefatos dos 5 modelos",
+        "view": training_view,
+    },
+    "crossval": {
+        "title_es": "Validación Cruzada",
+        "title_en": "Cross-Validation",
+        "title_pt": "Validação Cruzada",
+        "sub_es": "Resultados por fold, media y desviación estándar",
+        "sub_en": "Per-fold results, mean and standard deviation",
+        "sub_pt": "Resultados por fold, média e desvio padrão",
+        "view": cross_validation_view,
+    },
+    "hyperparams": {
+        "title_es": "Hiperparámetros",
+        "title_en": "Hyperparameters",
+        "title_pt": "Hiperparâmetros",
+        "sub_es": "Mejores parámetros encontrados por modelo",
+        "sub_en": "Best parameters found per model",
+        "sub_pt": "Melhores parâmetros encontrados por modelo",
+        "view": hyperparams_view,
+    },
+    "stats_tests": {
+        "title_es": "Pruebas Estadísticas",
+        "title_en": "Statistical Tests",
+        "title_pt": "Testes Estatísticos",
+        "sub_es": "Validación estadística del rendimiento de los modelos",
+        "sub_en": "Statistical validation of model performance",
+        "sub_pt": "Validação estatística do desempenho dos modelos",
+        "view": statistical_tests_view,
+    },
+    "comparison": {
+        "title_es": "Comparación de Modelos",
+        "title_en": "Model Comparison",
+        "title_pt": "Comparação de Modelos",
+        "sub_es": "Ranking completo ordenado por MCC, F1-macro y Accuracy",
+        "sub_en": "Full ranking sorted by MCC, F1-macro and Accuracy",
+        "sub_pt": "Ranking completo ordenado por MCC, F1-macro e Acurácia",
+        "view": model_comparison_view,
+    },
+    "best_model": {
+        "title_es": "Mejor Modelo",
+        "title_en": "Best Model",
+        "title_pt": "Melhor Modelo",
+        "sub_es": "Modelo seleccionado como óptimo para diagnóstico",
+        "sub_en": "Model selected as optimal for diagnosis",
+        "sub_pt": "Modelo selecionado como ótimo para diagnóstico",
+        "view": best_model_view,
+    },
+    "reports": {
+        "title_es": "Reportes",
+        "title_en": "Reports",
+        "title_pt": "Relatórios",
+        "sub_es": "Visualiza y descarga los reportes generados",
+        "sub_en": "View and download generated reports",
+        "sub_pt": "Visualize e baixe os relatórios gerados",
+        "view": reports_view,
+    },
+}
+
+page_info = PAGES.get(page)
+if page_info:
     render_header(
-        _t("Nuevo Diagnóstico", "New Diagnosis", "Novo Diagnóstico"),
-        _t("Analiza una hoja de vid", "Analyze a vine leaf", "Analise uma folha de videira"),
+        _t(page_info["title_es"], page_info["title_en"], page_info["title_pt"]),
+        _t(page_info["sub_es"], page_info["sub_en"], page_info["sub_pt"]),
     )
-    diagnosis_view()
-elif page == "history":
-    render_header(
-        _t("Historial", "History", "Histórico"),
-        _t("Diagnósticos realizados", "Past diagnoses", "Diagnósticos realizados"),
-    )
-    history_view()
-elif page == "models" and role == "admin":
-    render_header(
-        _t("Gestión de Modelos", "Model Management", "Gerenciamento de Modelos"),
-        _t("Estado y métricas de los modelos", "Model status and metrics", "Status e métricas dos modelos"),
-    )
-    models_view()
-elif page == "pipeline" and role == "admin":
-    render_header(
-        _t("Estado del Pipeline", "Pipeline Status", "Status do Pipeline"),
-        _t("Progreso del flujo de experimentación", "Experimentation flow progress", "Progresso do fluxo de experimentação"),
-    )
-    pipeline_view()
-elif page == "statistics" and role == "admin":
-    render_header(
-        _t("Estadísticas", "Statistics", "Estatísticas"),
-        _t("Análisis estadístico de rendimiento", "Performance statistical analysis", "Análise estatística de desempenho"),
-    )
-    statistics_view()
-elif page == "reports" and role == "admin":
-    render_header(
-        _t("Reportes", "Reports", "Relatórios"),
-        _t("Visualiza y descarga reportes", "View and download reports", "Visualize e baixe relatórios"),
-    )
-    reports_view()
-elif page == "info":
-    render_header(
-        _t("Información", "Information", "Informação"),
-        _t("Acerca del sistema", "About the system", "Sobre o sistema"),
-    )
-    info_view()
+    page_info["view"]()
 else:
-    if role == "admin":
-        render_header(
-            _t("Panel de Administración", "Admin Dashboard", "Painel de Administração"),
-            _t("Resumen ejecutivo del sistema", "System executive summary", "Resumo executivo do sistema"),
-        )
-        admin_dashboard()
-    else:
-        render_header(
-            _t("Inicio", "Home", "Início"),
-            _t("Bienvenido a VineGuard AI", "Welcome to VineGuard AI", "Bem-vindo ao VineGuard AI"),
-        )
-        client_dashboard()
+    st.session_state.page = "pipeline"
+    st.rerun()
 
 
 if __name__ == "__main__":

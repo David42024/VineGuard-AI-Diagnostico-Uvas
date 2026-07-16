@@ -23,14 +23,14 @@ def render():
 
 def _render_model_comparison():
     st.markdown("### Comparación de Métricas")
-    ranking = st.session_state.get("ranking_data", [])
+    ranking = st.session_state.get("ranking_data", []) or []
     if ranking:
         df = pd.DataFrame(ranking)
         display_cols = [c for c in ["modelo", "accuracy", "f1_score", "mcc", "precision", "recall"] if c in df.columns]
         if display_cols:
             st.dataframe(df[display_cols], use_container_width=True, hide_index=True)
 
-        best = st.session_state.get("best_model_name", "")
+        best = st.session_state.get("best_model_name", "") or ""
         if best:
             st.markdown(f"**Mejor modelo:** {best}")
     else:
