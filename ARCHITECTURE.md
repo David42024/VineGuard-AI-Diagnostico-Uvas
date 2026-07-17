@@ -1,428 +1,717 @@
 # VineGuard AI — Arquitectura del Sistema
 
-> Sistema de diagnóstico inteligente de enfermedades en hojas de vid usando redes neuronales convolucionales y modelos clásicos de ML.
+> Plataforma inteligente para el diagnóstico de enfermedades en hojas de vid mediante modelos clásicos, modelos híbridos y redes neuronales, con un laboratorio técnico en Streamlit, una API central en FastAPI y una aplicación web en Next.js.
 
 ---
 
-## 1. Vista General
+## 1. Objetivo de la arquitectura
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    USUARIO (Browser/Terminal)                │
-└──────────┬────────────────────────────────┬─────────────────┘
-           │                                │
-     ┌─────▼──────┐                  ┌──────▼──────┐
-     │  Streamlit  │                  │   Next.js   │
-     │  (app.py)   │                  │  Frontend   │
-     └─────┬──────┘                  └──────┬──────┘
-           │                                │
-           │                           HTTP │ (JSON)
-           │                                │
-           │                    ┌───────────▼───────────┐
-           │                    │   FastAPI Backend      │
-           │                    │   localhost:8000       │
-           │                    └───────────┬───────────┘
-           │                                │
-           ├──────────────┬─────────────────┤
-           │              │                 │
-     ┌─────▼────┐  ┌─────▼──────┐   ┌──────▼──────┐
-     │  SQLite  │  │   ML       │   │  Reports/   │
-     │  DB      │  │   Models   │   │  CSVs       │
-     │ vinguard │  │   (Python) │   │  (FS)       │
-     └──────────┘  └────────────┘   └─────────────┘
+VineGuard AI separa claramente tres responsabilidades:
+
+- **Streamlit AI Lab:** ejecución y visualización del pipeline de inteligencia artificial.
+- **FastAPI:** autenticación, diagnósticos, acceso a modelos, estadísticas y reportes.
+- **Next.js:** interfaz web final para administradores y clientes.
+
+La arquitectura evita duplicar la lógica de predicción y mantiene separados los datos operativos de la aplicación y los artefactos generados por Machine Learning.
+
+---
+
+## 2. Vista general
+
+```text
+                          ┌──────────────────────────┐
+                          │     Streamlit AI Lab     │
+                          │ EDA, entrenamiento, CV,  │
+                          │ tuning y estadística     │
+                          └────────────┬─────────────┘
+                                       │
+                                       │ Python
+                                       ▼
+┌───────────────────┐        ┌───────────────────────┐
+│ dataset_original/ │───────►│   Pipeline de ML      │
+└───────────────────┘        │  modelos y resultados │
+                             └────────────┬──────────┘
+                                          │
+                          ┌───────────────┴────────────────┐
+                          ▼                                ▼
+                ┌──────────────────┐             ┌──────────────────┐
+                │     models/      │             │     reports/     │
+                │ .h5, .pkl        │             │ CSV, PNG, DOCX   │
+                └────────┬─────────┘             └────────┬─────────┘
+                         │                                │
+                         └───────────────┬────────────────┘
+                                         ▼
+                              ┌─────────────────────┐
+                              │       FastAPI       │
+                              │ Auth, diagnóstico,  │
+                              │ modelos y reportes  │
+                              └──────────┬──────────┘
+                                         │
+                                         │ HTTP / JSON
+                                         ▼
+                              ┌─────────────────────┐
+                              │ Next.js + React     │
+                              │ Aplicación final    │
+                              └─────────────────────┘
+
+                              ┌─────────────────────┐
+                              │ SQLite              │
+                              │ users, diagnostics, │
+                              │ audit_log           │
+                              └─────────────────────┘
 ```
 
 ---
 
-## 2. Componentes
+## 3. Responsabilidad de cada componente
 
-### 2.1 Streamlit App (`app.py` + `ui/`)
+## 3.1 Streamlit AI Lab
+
+Streamlit funciona como el módulo técnico y experimental del sistema.
+
+### Funciones principales
+
+- Lectura y validación del dataset.
+- Análisis exploratorio de datos.
+- Preprocesamiento y aumento de imágenes.
+- Entrenamiento de modelos.
+- Validación cruzada configurable.
+- Optimización de hiperparámetros.
+- Pruebas estadísticas robustas.
+- Comparación y selección del mejor modelo.
+- Visualización de matrices de confusión, curvas ROC y métricas.
+- Generación y descarga de reportes técnicos.
+- Verificación de artefactos `.h5` y `.pkl`.
+
+### Directorios utilizados
+
+```text
+dataset_original/
+dataset/
+models/
+reports/
+```
+
+### Archivos principales
 
 | Archivo | Responsabilidad |
-|---------|----------------|
-| `app.py` | Entry point, session state, page routing, login gate |
-| `ui/auth.py` | Login/register screen, auth validation |
-| `ui/layout.py` | Sidebar navigation, header, theme toggle |
-| `ui/theme.py` | CSS variables, light/dark mode |
-| `ui/admin_dashboard.py` | Admin executive summary, metrics, charts |
-| `ui/client_dashboard.py` | Client home, recent diagnostics |
-| `ui/diagnosis_view.py` | Image upload + prediction flow |
-| `ui/history_view.py` | Diagnostic history table/filter |
-| `ui/models_view.py` | Model status, metrics, test form |
-| `ui/pipeline_view.py` | Pipeline stage progress visualization |
-| `ui/statistics_view.py` | Detailed stats: CV, bootstrap, McNemar, etc. |
-| `ui/reports_view.py` | Generated report listing + download |
-| `ui/info_view.py` | Disease info cards, about system |
-| `ui/components.py` | Reusable UI widgets (metric cards, badges, etc.) |
-
-### 2.2 FastAPI Backend (`backend/`)
-
-| Archivo | Responsabilidad |
-|---------|----------------|
-| `backend/main.py` | FastAPI app creation, CORS, lifespan, error handlers |
-| `backend/core/config.py` | `Settings` class via pydantic-settings (DB_URL, SECRET_KEY, etc.) |
-| `backend/core/security.py` | JWT creation/verification, bcrypt password hashing, `get_current_user` dependency |
-| `backend/database/database.py` | SQLAlchemy engine, ORM models (UserModel, DiagnosticModel, AuditLogModel), `get_db` |
-| `backend/api/auth.py` | `POST /login`, `POST /logout`, `POST /refresh`, `GET /me` |
-| `backend/api/diagnosis.py` | `POST /diagnoses`, `GET /diagnoses`, `GET /diagnoses/{id}`, `DELETE /{id}`, `POST /{id}/repeat` |
-| `backend/api/models.py` | `GET /models`, `GET /models/{id}`, `POST /models/test`, `GET /models/ranking`, `GET /models/best` |
-| `backend/api/pipeline.py` | `GET /pipeline/status`, `GET /pipeline/stages` |
-| `backend/api/statistics.py` | `GET /statistics/summary`, `/model-comparison`, `/cross-validation`, `/bootstrap`, `/mcnemar`, `/cochran` |
-| `backend/api/reports.py` | `GET /reports`, `POST /reports/diagnosis/{id}`, `GET /reports/{id}/download` |
-| `backend/api/users.py` | `GET /users`, `GET /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}` |
-| `backend/schemas/` | Pydantic models para request/response de cada módulo |
-
-### 2.3 Next.js Frontend (`frontend/`)
-
-| Archivo | Responsabilidad |
-|---------|----------------|
-| `src/middleware.ts` | Route protection: redirects unauthenticated users, enforces admin paths |
-| `src/app/layout.tsx` | Root layout with ThemeProvider + Toaster |
-| `src/app/(admin)/layout.tsx` | Admin layout: auth check, AppShell (Sidebar + Header) |
-| `src/app/(admin)/admin/page.tsx` | Admin Dashboard: stats grid, charts, recent diagnostics, users |
-| `src/app/(admin)/admin/statistics/page.tsx` | Detailed statistics: model comparison, CV, bootstrap, etc. |
-| `src/app/(admin)/admin/models/page.tsx` | Model management: cards, metrics, test form |
-| `src/app/(admin)/admin/pipeline/page.tsx` | Pipeline stage progress |
-| `src/app/(admin)/admin/reports/page.tsx` | Report listing + download |
-| `src/app/(admin)/admin/users/page.tsx` | User CRUD table |
-| `src/app/(admin)/admin/diagnostics/page.tsx` | All diagnostics table (admin) |
-| `src/app/(client)/dashboard/page.tsx` | Client home |
-| `src/app/(client)/dashboard/diagnosis/page.tsx` | Upload + diagnose |
-| `src/app/(client)/dashboard/history/page.tsx` | User's diagnostic history |
-| `src/app/(client)/dashboard/diseases/page.tsx` | Disease info cards |
-| `src/components/layout/sidebar.tsx` | Navigation sidebar with sections (Admin/Client) |
-| `src/components/layout/header.tsx` | Top header with page title, user menu |
-| `src/components/layout/app-shell.tsx` | Sidebar + Header + content wrapper |
-| `src/components/dashboard/stats-grid.tsx` | Metric cards row |
-| `src/components/dashboard/metric-card.tsx` | Single metric card |
-| `src/components/charts/donut-chart.tsx` | Recharts donut |
-| `src/components/charts/bar-chart.tsx` | Recharts bar |
-| `src/components/charts/line-chart.tsx` | Recharts line |
-| `src/lib/api.ts` | Axios instance with JWT interceptor |
-| `src/lib/auth.ts` | Token/session helpers (cookies) |
-| `src/store/auth-store.ts` | Zustand store: user, role, login/logout |
-| `src/store/theme-store.ts` | Zustand store: sidebar, language, theme |
-| `src/i18n/` | Translation files (es.json, en.json, pt.json) |
-
-### 2.4 ML Layer (`src/`)
-
-| Archivo | Responsabilidad |
-|---------|----------------|
-| `src/mantenedor.py` | Central constants: paths, class names, image sizes, seeds |
-| `src/predecir_imagen.py` | Core prediction engine: 5 model implementations |
-| `src/services/prediction_service.py` | Shared service: `predict_from_image()`, `predict_consensus()`, model loading with caching |
-| `src/train_*.py` | Training scripts for each model variant |
-| `src/evaluacion_comparativa.py` | Comparative evaluation across models |
-| `src/cross_validation_modelos.py` | K-fold cross-validation |
-| `src/validacion_estadistica_modelos.py` | Statistical tests: McNemar, Cochran, bootstrap |
-| `src/optimizacion_hiperparametros.py` | Hyperparameter tuning (GridSearch) |
-| `src/seleccion_mejor_modelo.py` | Best model selection logic |
-
-### 2.5 Database Layer
-
-Hay dos capas de BD que apuntan al mismo archivo SQLite:
-
-| Archivo | Tecnología | Uso |
-|---------|-----------|-----|
-| `database/repository.py` | `sqlite3` (raw) | Streamlit app + algunas rutas FastAPI |
-| `backend/database/database.py` | SQLAlchemy ORM | FastAPI endpoints via `get_db()` |
-| `scripts/db.mjs` | `better-sqlite3` (Node.js) | Scripts de init/reset/seed |
-
-**Tablas:**
-- `users` — id, name, username, password_hash, role (admin/client), active, created_at, last_login
-- `diagnostics` — id, user_id (FK), timestamp, filename, image_path, result, confidence, model_used, probabilities (JSON), inference_time_ms, analysis_type, status
-- `audit_log` — id, user_id (FK), action, detail, timestamp
-- `models` — id, name, type, accuracy, precision, recall, f1_score, status (creada por scripts de seed)
-
-**Seed users:**
-| Username | Password | Rol |
-|----------|----------|-----|
-| `admin` | `admin123` | admin |
-| `usuario` | `12345` | client |
+|---|---|
+| `app.py` | Punto de entrada, sesión, navegación y control de acceso |
+| `ui/auth.py` | Inicio de sesión y validación |
+| `ui/layout.py` | Sidebar, encabezado y navegación |
+| `ui/theme.py` | Tema claro/oscuro |
+| `ui/admin_dashboard.py` | Resumen ejecutivo |
+| `ui/client_dashboard.py` | Inicio del cliente |
+| `ui/diagnosis_view.py` | Diagnóstico de imágenes |
+| `ui/history_view.py` | Historial |
+| `ui/models_view.py` | Estado y métricas de modelos |
+| `ui/pipeline_view.py` | Estado del pipeline |
+| `ui/statistics_view.py` | Resultados estadísticos |
+| `ui/reports_view.py` | Reportes generados |
+| `ui/components.py` | Componentes reutilizables |
 
 ---
 
-## 3. Flujo de Datos
+## 3.2 FastAPI
 
-### 3.1 Diagnóstico (Frontend → API → ML → DB)
+FastAPI es el núcleo operativo del sistema y el único punto de acceso para el frontend Next.js.
 
-```
-Usuario sube imagen
-        │
-        ▼
-Next.js /dashboard/diagnosis
-  POST /api/v1/diagnoses (multipart: file + model_key)
-        │
-        ▼
-FastAPI create_diagnosis()
-  ├── Valida JWT (get_current_user)
-  ├── Guarda imagen en data/uploads/
-  ├── Carga modelo (load_single_model o load_all_models)
-  ├── predict_from_image() o predict_consensus()
-  │     └── src/predecir_imagen.py
-  │           ├── Extrae características (HSV, LBP, CNN, Transfer)
-  │           └── Clasifica (SVM, RF, KNN)
-  ├── save_diagnostic() → SQLite (diagnostics table)
-  ├── audit_log() → SQLite (audit_log table)
-  └── Retorna DiagnosisResponse (JSON)
-        │
-        ▼
-Next.js renderiza resultado
-  └── Badge (Healthy/Enfermedad)
-  └── Barra de confianza
-  └── Tabla de probabilidades por clase
-  └── Información de la enfermedad
+### Funciones principales
+
+- Autenticación y autorización mediante JWT.
+- Gestión de usuarios.
+- Diagnóstico de imágenes.
+- Carga y uso de modelos entrenados.
+- Consulta del ranking de modelos.
+- Consulta de estadísticas y resultados del pipeline.
+- Gestión de reportes.
+- Registro de diagnósticos.
+- Registro de auditoría.
+- Exposición de datos en formato JSON.
+
+### Regla principal
+
+Next.js no debe leer directamente SQLite, CSV, `.h5` ni `.pkl`.
+
+```text
+Next.js → FastAPI → SQLite / models / reports
 ```
 
-### 3.2 Autenticación
+### Archivos principales
 
-```
-Login form
-  POST /api/v1/auth/login { username, password }
-        │
-        ▼
-  authenticate() → SQLite (users table, SHA-256 hash)
-        │
-        ▼
-  create_access_token() → JWT (HS256, 60min exp)
-        │
-        ▼
-  Response: { access_token, user: { id, name, username, role } }
-        │
-        ▼
-  Next.js: guarda token en cookie, user en Zustand store
-```
-
-### 3.3 Carga de Modelos ML
-
-Los modelos se cargan **lazy** (on-demand) con caché:
-
-```
-1. GET /api/v1/models → get_model_status()
-   └── Verifica si archivos .pkl/.h5 existen en models/
-
-2. POST /api/v1/diagnoses (model_key="M1")
-   └── load_single_model("M1")
-       └── Carga SVM desde models/svm_model.pkl + scaler
-       └── Almacena en dict global _modelos (caché)
-
-3. model_key="consensus"
-   └── load_all_models() → carga los 5 (si no están en caché)
-   └── predict_consensus() → ejecuta los 5, vota
-```
-
-**Los 5 modelos:**
-
-| Key | Nombre | Tipo | Archivos |
-|-----|--------|------|----------|
-| M1 | SVM | Classic ML | `svm_model.pkl`, `svm_scaler.pkl` |
-| M2 | Random Forest | Classic ML | `random_forest_model.pkl` |
-| M3 | KNN | Classic ML | `knn_model.pkl`, `knn_scaler.pkl` |
-| H1 | CNN + SVM | Hybrid (H1) | `cnn_feature_extractor.h5`, `h1_svm_classifier.pkl` |
-| H2 | Transfer + RF | Hybrid (H2) | `transfer_feature_extractor.h5`, `transfer_random_forest_model.pkl` |
+| Archivo | Responsabilidad |
+|---|---|
+| `backend/main.py` | Creación de la API, CORS y manejo de errores |
+| `backend/core/config.py` | Variables de entorno y configuración |
+| `backend/core/security.py` | JWT y hashing de contraseñas |
+| `backend/database/database.py` | Conexión ORM a SQLite |
+| `backend/api/auth.py` | Login, logout, refresh y usuario actual |
+| `backend/api/diagnosis.py` | Crear y consultar diagnósticos |
+| `backend/api/models.py` | Estado, ranking y mejor modelo |
+| `backend/api/pipeline.py` | Estado del pipeline |
+| `backend/api/statistics.py` | Estadísticas, CV y pruebas |
+| `backend/api/reports.py` | Generación y descarga de reportes |
+| `backend/api/users.py` | Gestión de usuarios |
+| `backend/schemas/` | Esquemas Pydantic |
 
 ---
 
-## 4. API Endpoints (FastAPI)
+## 3.3 Next.js
 
-### Auth (`/api/v1/auth`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| POST | `/login` | No | Login, devuelve JWT + user |
-| POST | `/logout` | JWT | Cerrar sesión |
-| POST | `/refresh` | JWT | Refrescar token |
-| GET | `/me` | JWT | Info del usuario actual |
+Next.js es la aplicación web final orientada a administradores y clientes.
 
-### Diagnoses (`/api/v1/diagnoses`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| POST | `/` | JWT | Crear diagnóstico (upload + model_key o "consensus") |
-| GET | `/` | JWT | Listar diagnósticos (admin: todos, client: propios) |
-| GET | `/{id}` | JWT | Detalle de diagnóstico |
-| DELETE | `/{id}` | JWT | Eliminar diagnóstico |
-| POST | `/{id}/repeat` | JWT | Repetir diagnóstico con misma imagen |
+### Funciones del cliente
 
-### Models (`/api/v1/models`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/` | JWT | Listar 5 modelos con métricas |
-| GET | `/{id}` | JWT | Detalle de un modelo |
-| POST | `/test` | JWT | Probar modelo con imagen |
-| GET | `/ranking` | JWT | Ranking desde CSV |
-| GET | `/best` | JWT | Mejor modelo desde archivo |
+- Iniciar sesión.
+- Subir una imagen.
+- Ejecutar un diagnóstico.
+- Consultar confianza y probabilidades.
+- Revisar historial.
+- Consultar información de enfermedades.
+- Descargar reportes.
+- Usar chatbot por texto y voz.
+- Cambiar idioma.
+- Cambiar tema.
 
-### Statistics (`/api/v1/statistics`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/summary` | Admin | Stats generales + distribución + ranking |
-| GET | `/model-comparison` | JWT | Ranking, effect size, Diebold-Mariano |
-| GET | `/cross-validation` | JWT | Resultados CV por fold |
-| GET | `/bootstrap` | JWT | Intervalos de confianza bootstrap |
-| GET | `/mcnemar` | JWT | Test McNemar + Holm post-hoc |
-| GET | `/cochran` | JWT | Test Cochran Q |
+### Funciones del administrador
 
-### Pipeline (`/api/v1/pipeline`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/status` | JWT | Progreso del pipeline (6 etapas) |
-| GET | `/stages` | JWT | Info detallada por etapa |
+- Ver dashboard general.
+- Consultar diagnósticos.
+- Consultar usuarios.
+- Revisar ranking de modelos.
+- Revisar estado del pipeline.
+- Consultar estadísticas.
+- Descargar reportes.
 
-### Reports (`/api/v1/reports`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/` | JWT | Listar reportes generados |
-| POST | `/diagnosis/{id}` | JWT | Generar reporte DOCX |
-| GET | `/{id}/download` | JWT | Descargar archivo |
+### Archivos principales
 
-### Users (`/api/v1/users`)
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/` | Admin | Listar usuarios |
-| GET | `/{id}` | Admin | Detalle usuario |
-| PATCH | `/{id}` | Admin | Actualizar usuario |
-| DELETE | `/{id}` | Admin | Eliminar usuario |
-
-### Health
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| GET | `/health` | No | Health check |
+| Archivo | Responsabilidad |
+|---|---|
+| `src/middleware.ts` | Protección de rutas |
+| `src/app/layout.tsx` | Layout raíz |
+| `src/app/(admin)/layout.tsx` | Layout administrativo |
+| `src/app/(admin)/admin/page.tsx` | Dashboard administrativo |
+| `src/app/(admin)/admin/models/page.tsx` | Modelos |
+| `src/app/(admin)/admin/pipeline/page.tsx` | Pipeline |
+| `src/app/(admin)/admin/statistics/page.tsx` | Estadísticas |
+| `src/app/(admin)/admin/reports/page.tsx` | Reportes |
+| `src/app/(admin)/admin/users/page.tsx` | Usuarios |
+| `src/app/(client)/dashboard/page.tsx` | Inicio del cliente |
+| `src/app/(client)/dashboard/diagnosis/page.tsx` | Diagnóstico |
+| `src/app/(client)/dashboard/history/page.tsx` | Historial |
+| `src/components/layout/` | Sidebar, header y AppShell |
+| `src/components/dashboard/` | Tarjetas y métricas |
+| `src/lib/api.ts` | Cliente Axios |
+| `src/lib/auth.ts` | Gestión de sesión |
+| `src/store/` | Estado global con Zustand |
+| `src/i18n/` | Traducciones español/inglés |
 
 ---
 
-## 5. DB Scripts (`scripts/`)
+## 4. Persistencia
 
-Scripts Node.js que operan sobre `data/vinguard.db` usando `better-sqlite3`:
+VineGuard AI utiliza dos mecanismos de persistencia separados.
+
+## 4.1 SQLite: datos operativos
+
+Archivo:
+
+```text
+data/vinguard.db
+```
+
+Tablas principales:
+
+| Tabla | Contenido |
+|---|---|
+| `users` | Cuentas, roles, hashes de contraseñas y último acceso |
+| `diagnostics` | Resultado, confianza, modelo usado, archivo y fecha |
+| `audit_log` | Accesos y acciones realizadas |
+| `models` | Metadatos básicos opcionales de modelos |
+
+SQLite no guarda los pesos entrenados ni los resultados completos del pipeline.
+
+## 4.2 Archivos del pipeline ML
+
+| Ruta | Contenido |
+|---|---|
+| `models/*.pkl` | SVM, Random Forest, KNN y clasificadores híbridos |
+| `models/*.h5` | Extractores CNN y modelos Keras |
+| `reports/modelos/ranking_modelos.csv` | Ranking final |
+| `reports/modelos/*/resultados_*.csv` | Métricas por modelo |
+| `reports/modelos/cross_validation/` | Resultados de validación cruzada |
+| `reports/modelos/tuning/` | Mejores hiperparámetros |
+| `reports/estadistica/` | McNemar, Cochran-Q, Bootstrap y tamaños de efecto |
+| `reports/eda/` | Análisis exploratorio |
+| `reports/preprocessing/` | Ejemplos de aumento |
+| `reports/modelos/*.png` | Matrices de confusión y curvas ROC |
+
+### Fuente de verdad
+
+Los archivos persistidos son la fuente real de los resultados.
+
+`st.session_state` solo actúa como caché temporal de interfaz.
+
+```text
+ranking_modelos.csv
+        ↓
+Streamlit lo carga
+        ↓
+st.session_state.ranking_data
+```
+
+Si la sesión termina, los datos se recuperan nuevamente desde los archivos.
+
+---
+
+## 5. Modelos de Machine Learning
+
+| Key | Modelo | Tipo | Artefactos |
+|---|---|---|---|
+| `M1` | SVM | Clásico | `svm_model.pkl`, `svm_scaler.pkl` |
+| `M2` | Random Forest | Clásico | `random_forest_model.pkl` |
+| `M3` | KNN | Clásico | `knn_model.pkl`, `knn_scaler.pkl` |
+| `H1` | CNN + SVM | Híbrido | `cnn_feature_extractor.h5`, `h1_svm_classifier.pkl` |
+| `H2` | MobileNetV2 + RF | Híbrido | `transfer_feature_extractor.h5`, `transfer_random_forest_model.pkl` |
+
+El modelo H1 no se representa únicamente mediante un archivo `.h5`. Su pipeline completo está formado por:
+
+```text
+Extractor CNN (.h5) + Clasificador SVM (.pkl)
+```
+
+FastAPI carga ambos artefactos como una sola unidad de inferencia.
+
+---
+
+## 6. Pipeline de entrenamiento
+
+```text
+1. Preparación del dataset
+2. EDA
+3. Preprocesamiento y aumento
+4. Entrenamiento de modelos
+5. Validación cruzada
+6. Optimización de hiperparámetros
+7. Pruebas estadísticas
+8. Comparación de modelos
+9. Selección del mejor modelo
+10. Persistencia de artefactos
+```
+
+### Flujo
+
+```text
+dataset_original/
+        │
+        ▼
+prepare_dataset.py
+        │
+        ▼
+dataset/train + dataset/test
+        │
+        ▼
+preprocesamiento_aumento.py
+        │
+        ├── train_m1_svm.py
+        ├── train_m2_random_forest.py
+        ├── train_m3_knn.py
+        ├── train_h1_cnn_svm.py
+        └── train_h2_transfer_random_forest.py
+        │
+        ▼
+cross_validation_modelos.py
+        │
+        ▼
+optimizacion_hiperparametros.py
+        │
+        ▼
+validacion_estadistica_modelos.py
+        │
+        ▼
+evaluacion_comparativa.py
+        │
+        ▼
+seleccion_mejor_modelo.py
+        │
+        ├── reports/modelos/ranking_modelos.csv
+        └── reports/modelos/mejor_modelo.json
+```
+
+---
+
+## 7. Servicios compartidos
+
+Para evitar duplicar lógica entre Streamlit y FastAPI, se centralizan dos servicios.
+
+## 7.1 Servicio de predicción
+
+Archivo:
+
+```text
+src/services/prediction_service.py
+```
+
+Responsabilidades:
+
+```python
+load_single_model(model_key)
+load_all_models()
+predict_from_image(image, model_key)
+predict_consensus(image)
+get_best_model()
+```
+
+## 7.2 Servicio de resultados
+
+Archivo recomendado:
+
+```text
+src/services/results_service.py
+```
+
+Responsabilidades:
+
+```python
+load_model_ranking()
+load_best_model()
+load_cross_validation_results()
+load_tuning_results()
+load_statistical_results()
+get_pipeline_status()
+```
+
+---
+
+## 8. Archivo del mejor modelo
+
+Además del ranking CSV, se recomienda mantener:
+
+```text
+reports/modelos/mejor_modelo.json
+```
+
+Ejemplo:
+
+```json
+{
+  "key": "H1",
+  "name": "CNN+SVM",
+  "accuracy": 0.9890,
+  "f1_macro": 0.9912,
+  "mcc": 0.9847,
+  "artifacts": [
+    "models/cnn_feature_extractor.h5",
+    "models/h1_svm_classifier.pkl"
+  ]
+}
+```
+
+Este archivo facilita que FastAPI identifique el modelo seleccionado sin tener que interpretar el ranking completo en cada solicitud.
+
+---
+
+## 9. Flujo de diagnóstico
+
+```text
+Usuario sube una imagen
+        │
+        ▼
+Next.js envía FormData
+        │
+        ▼
+POST /api/v1/diagnoses
+        │
+        ▼
+FastAPI valida JWT
+        │
+        ▼
+FastAPI identifica el modelo
+        │
+        ▼
+prediction_service carga .h5/.pkl
+        │
+        ▼
+Se realiza la inferencia
+        │
+        ▼
+El resultado se guarda en SQLite
+        │
+        ▼
+FastAPI devuelve JSON
+        │
+        ▼
+Next.js muestra el diagnóstico
+```
+
+Ejemplo de respuesta:
+
+```json
+{
+  "id": 35,
+  "result": "Black_rot",
+  "confidence": 0.9421,
+  "model_used": "H1",
+  "probabilities": {
+    "Black_rot": 0.9421,
+    "Esca": 0.0312,
+    "Healthy": 0.0104,
+    "Leaf_blight": 0.0163
+  }
+}
+```
+
+---
+
+## 10. Flujo de autenticación
+
+```text
+Next.js
+  POST /api/v1/auth/login
+        │
+        ▼
+FastAPI consulta users en SQLite
+        │
+        ▼
+Valida contraseña
+        │
+        ▼
+Genera JWT
+        │
+        ▼
+Devuelve access_token + usuario
+        │
+        ▼
+Next.js guarda sesión y rol
+```
+
+---
+
+## 11. Endpoints principales
+
+### Autenticación
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/v1/auth/login` | Iniciar sesión |
+| `POST` | `/api/v1/auth/logout` | Cerrar sesión |
+| `POST` | `/api/v1/auth/refresh` | Renovar token |
+| `GET` | `/api/v1/auth/me` | Usuario actual |
+
+### Diagnósticos
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/v1/diagnoses` | Crear diagnóstico |
+| `GET` | `/api/v1/diagnoses` | Listar diagnósticos |
+| `GET` | `/api/v1/diagnoses/{id}` | Obtener detalle |
+| `DELETE` | `/api/v1/diagnoses/{id}` | Eliminar diagnóstico |
+| `POST` | `/api/v1/diagnoses/{id}/repeat` | Repetir diagnóstico |
+
+### Modelos
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/models` | Listar modelos |
+| `GET` | `/api/v1/models/ranking` | Obtener ranking |
+| `GET` | `/api/v1/models/best` | Obtener mejor modelo |
+| `POST` | `/api/v1/models/test` | Probar un modelo |
+
+### Pipeline y estadísticas
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/pipeline/status` | Estado general |
+| `GET` | `/api/v1/pipeline/stages` | Estado por etapa |
+| `GET` | `/api/v1/statistics/summary` | Resumen |
+| `GET` | `/api/v1/statistics/cross-validation` | Validación cruzada |
+| `GET` | `/api/v1/statistics/bootstrap` | Bootstrap |
+| `GET` | `/api/v1/statistics/mcnemar` | McNemar |
+| `GET` | `/api/v1/statistics/cochran` | Cochran-Q |
+
+### Reportes y usuarios
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/reports` | Listar reportes |
+| `POST` | `/api/v1/reports/diagnosis/{id}` | Generar reporte |
+| `GET` | `/api/v1/reports/{id}/download` | Descargar reporte |
+| `GET` | `/api/v1/users` | Listar usuarios |
+| `PATCH` | `/api/v1/users/{id}` | Actualizar usuario |
+| `DELETE` | `/api/v1/users/{id}` | Eliminar usuario |
+
+---
+
+## 12. Bilingüe, tema y chatbot
+
+### Bilingüe
+
+- Streamlit: diccionarios Python y `st.session_state`.
+- Next.js: archivos `src/i18n/es.json` y `src/i18n/en.json`.
+
+### Modo claro/oscuro
+
+- Streamlit: variables CSS centralizadas en `ui/theme.py`.
+- Next.js: Tailwind CSS, variables semánticas y Zustand.
+
+### Chatbot
+
+El chatbot se implementa principalmente en Next.js.
+
+Funciones:
+
+- Entrada de texto.
+- Reconocimiento de voz desde el navegador.
+- Síntesis de voz.
+- Preguntas frecuentes.
+- Ayuda sobre diagnósticos.
+- Explicación de resultados.
+
+Endpoint recomendado:
+
+```text
+POST /api/v1/chat
+```
+
+---
+
+## 13. Despliegue
+
+| Componente | Plataforma |
+|---|---|
+| Streamlit AI Lab | Render |
+| FastAPI | Render |
+| Next.js | Vercel |
+| Código fuente | GitHub |
+| Documentación y seguimiento | Jira |
+
+### Streamlit en Render
 
 ```bash
-npm run db:init      # Crear tablas si no existen
-npm run db:reset     # Drop all tables + recreate
-npm run db:seed      # Seed con 150 diagnósticos realistas
-npm run db:seed:100  # Seed con 100
-npm run db:seed:250  # Seed con 250
-npm run db:check     # Debug: muestra estado de la DB
+streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 ```
 
-El seed crea:
-- 4 usuarios (admin + 3 clientes)
-- 5 modelos con métricas reales
-- N diagnósticos con fechas aleatorias (últimos 30 días)
-- Proporción ~25% Healthy, ~75% enfermedades
+### FastAPI en Render
 
----
-
-## 6. Modelos ML — Pipeline de Entrenamiento
-
-```
-dataset_original/ (4 clases: Healthy, Black_rot, Esca, Leaf_blight)
-        │
-        ▼
-prepare_dataset.py → dataset/ (train/test 80/20)
-        │
-        ▼
-preprocesamiento_aumento.py → Augmentation (rotation, flip, zoom, etc.)
-        │
-        ├──► train_m1_svm.py           → SVM + features clásicas
-        ├──► train_m2_random_forest.py → Random Forest + features clásicas
-        ├──► train_m3_knn.py           → KNN + features clásicas
-        ├──► train_h1_cnn_svm.py       → CNN feature extractor + SVM
-        └──► train_h2_transfer_rf.py   → MobileNetV2 transfer + RF
-                │
-                ▼
-        comparacion_general_modelos.py → ranking_modelos.csv
-                │
-                ▼
-        seleccion_mejor_modelo.py → H1 (CNN+SVM) es el mejor
-                                    96.7% accuracy
-```
-
----
-
-## 7. Stack Tecnológico
-
-| Capa | Tecnología | Versión |
-|------|-----------|---------|
-| ML Framework | TensorFlow / Keras | 2.13 |
-| Classic ML | scikit-learn | 1.3 |
-| API | FastAPI + uvicorn | 0.110 / 0.27 |
-| ORM | SQLAlchemy | 2.0 |
-| Auth | python-jose (JWT) + passlib (bcrypt) | — |
-| Frontend (web) | Next.js 14 + React 18 | 14.2 |
-| Frontend (ml) | Streamlit | 1.29 |
-| Charts (web) | Recharts | 2.12 |
-| State (web) | Zustand | 4.5 |
-| Styling (web) | TailwindCSS + shadcn/ui | 3.4 |
-| DB | SQLite (via sqlite3, SQLAlchemy, better-sqlite3) | — |
-| DB Scripts | Node.js + better-sqlite3 | 22 / 11 |
-
----
-
-## 8. Convenciones para IA
-
-### Rutas de importación
-- FastAPI: `backend/` es un package, se importa como `from backend.core.config import settings`
-- ML: `src/` se agrega al `sys.path`, se importa como `from src.services.prediction_service import ...`
-- Streamlit: igual, `src/` en `sys.path`
-- Frontend: usa `@/` alias para `src/` (ej: `import api from "@/lib/api"`)
-
-### Agregar una nueva API endpoint
-1. Crear el schema en `backend/schemas/`
-2. Crear/editar el router en `backend/api/`
-3. Incluir el router en `backend/main.py`
-
-### Agregar un modelo nuevo
-1. Crear el training script en `src/train_*.py`
-2. Agregar la key y el loader en `src/predecir_imagen.py`
-3. Agregar al servicio en `src/services/prediction_service.py`
-4. Agregar display name en el `mantenedor.py` o en el servicio
-
-### Debug DB
 ```bash
-# Terminal
-cd scripts && node check-db.mjs
+uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+```
 
-# Al iniciar backend
-uvicorn backend.main:app --reload
-# Muestra banner con users, diags, models
+### Next.js en Vercel
+
+Variable de entorno:
+
+```env
+NEXT_PUBLIC_API_URL=https://vinguard-api.onrender.com/api/v1
+```
+
+### Persistencia de SQLite
+
+SQLite requiere un disco persistente en Render.
+
+Ruta recomendada:
+
+```text
+/var/data/vinguard.db
+```
+
+Ejemplo:
+
+```env
+DATABASE_URL=sqlite:////var/data/vinguard.db
 ```
 
 ---
 
-## 9. Estructura de Directorios
+## 14. Backups
 
+Para respaldar el sistema se deben conservar:
+
+```text
+data/vinguard.db
+models/
+reports/
 ```
-├── app.py                    # Streamlit entry point
-├── backend/                  # FastAPI backend
+
+- `vinguard.db`: usuarios, diagnósticos y auditoría.
+- `models/`: artefactos entrenados.
+- `reports/`: métricas, gráficos y resultados.
+
+Si se eliminan `models/` o `reports/`, se pierde el resultado del pipeline aunque SQLite siga intacto.
+
+---
+
+## 15. Estructura del proyecto
+
+```text
+├── app.py
+├── backend/
 │   ├── main.py
-│   ├── api/                  # Routers (auth, diagnosis, models, ...)
-│   ├── core/                 # Config, security
-│   ├── database/             # SQLAlchemy models + engine
-│   └── schemas/              # Pydantic models
-├── frontend/                 # Next.js web app
+│   ├── api/
+│   ├── core/
+│   ├── database/
+│   └── schemas/
+├── frontend/
 │   └── src/
-│       ├── app/              # Pages + layouts
-│       ├── components/       # UI components (shadcn + custom)
-│       ├── lib/              # API client, auth, utils
-│       ├── store/            # Zustand stores
-│       └── i18n/             # Translations (es/en/pt)
-├── scripts/                  # Node.js DB scripts
-├── database/                 # Raw SQLite repository (Streamlit)
+│       ├── app/
+│       ├── components/
+│       ├── lib/
+│       ├── store/
+│       └── i18n/
+├── database/
 │   └── repository.py
-├── src/                      # ML training + prediction
-│   ├── services/             # Shared prediction service
-│   ├── predecir_imagen.py    # Core prediction engine
-│   ├── mantenedor.py         # Constants
-│   └── train_*.py            # Training scripts
-├── ui/                       # Streamlit UI pages
-│   ├── layout.py, theme.py, auth.py
-│   ├── admin_dashboard.py, client_dashboard.py
-│   ├── diagnosis_view.py, history_view.py
-│   ├── models_view.py, pipeline_view.py
-│   ├── statistics_view.py, reports_view.py
-│   └── info_view.py
-├── models/                   # Trained .pkl/.h5 files
-├── dataset/                  # Processed train/test split
-├── dataset_original/         # Raw images
-├── reports/                  # Generated CSVs, plots, docs
-└── data/                     # SQLite database
-    └── vinguard.db
+├── scripts/
+├── src/
+│   ├── services/
+│   │   ├── prediction_service.py
+│   │   └── results_service.py
+│   ├── mantenedor.py
+│   ├── predecir_imagen.py
+│   ├── train_m1_svm.py
+│   ├── train_m2_random_forest.py
+│   ├── train_m3_knn.py
+│   ├── train_h1_cnn_svm.py
+│   ├── train_h2_transfer_random_forest.py
+│   ├── cross_validation_modelos.py
+│   ├── optimizacion_hiperparametros.py
+│   ├── validacion_estadistica_modelos.py
+│   ├── evaluacion_comparativa.py
+│   └── seleccion_mejor_modelo.py
+├── ui/
+├── data/
+│   └── vinguard.db
+├── models/
+├── reports/
+├── dataset/
+└── dataset_original/
 ```
+
+---
+
+## 16. Decisiones de arquitectura
+
+- SQLite se mantiene para los datos operativos.
+- Los modelos no se almacenan en SQLite.
+- Los resultados del pipeline permanecen en archivos.
+- Streamlit se usa como laboratorio técnico.
+- Next.js se usa como aplicación final.
+- FastAPI centraliza el acceso a datos y modelos.
+- Next.js nunca accede directamente a SQLite ni al sistema de archivos.
+- La lógica de predicción se comparte mediante `prediction_service.py`.
+- La lectura de resultados se comparte mediante `results_service.py`.
+- `st.session_state` se usa solo como caché temporal.
+- No se requiere una migración a PostgreSQL para la versión académica.
+
+---
+
+## 17. Orden de trabajo
+
+1. Consolidar las vistas y funciones de Streamlit.
+2. Centralizar rutas, predicción y lectura de resultados.
+3. Completar endpoints de FastAPI.
+4. Integrar Next.js con FastAPI.
+5. Implementar bilingüe, tema y chatbot.
+6. Ejecutar pruebas integrales.
+7. Desplegar Streamlit y FastAPI en Render.
+8. Desplegar Next.js en Vercel.
+9. Registrar tareas, evidencias y pruebas en Jira.

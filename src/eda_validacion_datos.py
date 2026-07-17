@@ -30,9 +30,8 @@ import matplotlib
 matplotlib.use("Agg")                          # backend sin GUI (compatible con servidores)
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
-import sys
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 elif hasattr(sys.stdout, 'buffer'):
@@ -58,6 +57,7 @@ from mantenedor import (
 # ─── Constantes ──────────────────────────────────────────────────────────────
 REPORTS_DIR = Path(__file__).resolve().parent.parent / "reports" / "eda"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+BALANCE_RATIO_THRESHOLD = 1.5
 
 SECTION_WIDTH = 62
 
@@ -247,11 +247,11 @@ def contar_imagenes_por_clase() -> pd.DataFrame:
     counts = df["Total_usado"].values
     ratio_max_min = counts.max() / counts.min() if counts.min() > 0 else float("inf")
     print(f"  Ratio max/min de imágenes físicas: {ratio_max_min:.2f}")
-    if ratio_max_min <= 1.2:
-        print(f"  ✅ Dataset físico balanceado")
+    if ratio_max_min <= BALANCE_RATIO_THRESHOLD:
+        print(f"  ✅ Dataset físico balanceado (ratio ≤ {BALANCE_RATIO_THRESHOLD})")
     else:
         print(f"  ⚠️  Dataset físico desbalanceado — se balanceará dinámicamente durante entrenamiento")
-        print(f"  🎯 Target: {1500} muestras por clase mediante aumento en memoria")
+        print(f"  🎯 Target: {TARGET_TRAIN_SAMPLES_PER_CLASS} muestras por clase mediante aumento en memoria")
     print(f"  ℹ️  Las muestras aumentadas no existen como archivos físicos")
 
     return df
@@ -337,7 +337,7 @@ def validar_corruptas() -> list[dict]:
                 try:
                     with Image.open(img_path) as im:
                         im.verify()         # detecta corrupción sin leer pixels
-                except (UnidentifiedImageError, Exception) as e:
+                except Exception as e:
                     corruptas.append({
                         "split":  split_name,
                         "clase":  clase,
@@ -811,7 +811,7 @@ def reporte_final(
     stats_desc = generar_estadisticas_descriptivas(df_conteo)
     counts = df_conteo["Total_usado"].values
     ratio = float(counts.max() / counts.min()) if counts.min() > 0 else 999.0
-    balanceado = ratio <= 2.0
+    balanceado = ratio <= BALANCE_RATIO_THRESHOLD
     tot_orig = int(df_conteo["Original"].sum())
     tot_train = int(df_conteo["Train"].sum())
     tot_test = int(df_conteo["Test"].sum())
@@ -840,10 +840,15 @@ def reporte_final(
     Test:  {tot_test} ({100-pct_train:.1f}%)
 
   Balance del dataset:
-    {'✅ Balanceado (físico)' if balanceado else f'⚠️  Físicamente desbalanceado (ratio {ratio:.2f}) — se balanceará a {TARGET_TRAIN_SAMPLES_PER_CLASS}/clase en entrenamiento'}
+    {'✅ Balanceado (físico)' if balanceado else f'⚠️  Físicamente desbalanceado (ratio {ratio:.2f}) — se aplicará balanceo dinámico solo en train'}
 
   Estado del dataset:
 """)
+
+    balanceo_configurado = (
+        isinstance(TARGET_TRAIN_SAMPLES_PER_CLASS, int)
+        and TARGET_TRAIN_SAMPLES_PER_CLASS > 0
+    )
 
     criterios = {
         "Estructura de carpetas completa":    estructura["estructura_ok"],
@@ -851,8 +856,6 @@ def reporte_final(
         "Sin imágenes corruptas":             len(corruptas) == 0,
         "Sin archivos con formato inválido":  len(invalidos) == 0,
         "División train/test cercana a 80/20": abs(pct_train - 80) <= 5,
-        "Balanceo dinámico en entrenamiento": True,
-        "Target muestras/clase":              TARGET_TRAIN_SAMPLES_PER_CLASS,
     }
 
     todos_ok = True
@@ -862,13 +865,19 @@ def reporte_final(
         if not ok:
             todos_ok = False
 
-    if balanceado:
-        print(f"  ✅ Dataset balanceado (ratio ≤ 2.0)")
+    print(f"  ℹ️  Target configurado para entrenamiento: {TARGET_TRAIN_SAMPLES_PER_CLASS} muestras/clase")
+    if balanceo_configurado:
+        print(f"  ℹ️  Balanceo dinámico configurado para el entrenamiento")
     else:
-        print(f"  ⚠️  Dataset desbalanceado (ratio {ratio:.2f}) — se balanceará a {TARGET_TRAIN_SAMPLES_PER_CLASS}/clase en entrenamiento")
+        print(f"  ⚠️  Balanceo dinámico NO configurado correctamente")
 
     print()
-    print(f"  {'✅ Dataset válido para entrenamiento' if todos_ok else '⚠️  Dataset requiere revisión'}")
+
+    if not balanceado:
+        print(f"  ⚠️  Advertencia: dataset desbalanceado (ratio {ratio:.2f})")
+        print(f"  ℹ️  El balanceo se aplicará solo en train. Test conserva su distribución original.")
+
+    print(f"  {'✅ Dataset estructuralmente válido para entrenamiento' if todos_ok else '⚠️  Dataset requiere revisión'}")
     print(f"  Reportes guardados en: {REPORTS_DIR}")
     print(f"  Análisis completado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * SECTION_WIDTH)

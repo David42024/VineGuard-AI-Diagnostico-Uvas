@@ -11,6 +11,12 @@ usan validation_split durante el entrenamiento.
 
 import shutil
 import random
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 from mantenedor import (
     DATASET_ORIGINAL_DIR,
@@ -50,6 +56,30 @@ def copiar_split(imagenes, destino):
     destino.mkdir(parents=True, exist_ok=True)
     for img in imagenes:
         shutil.copy2(img, destino / img.name)
+
+
+def verificar_solapamiento():
+    """Verifica que no haya imágenes repetidas entre train y test."""
+    train_names = {
+        (p.parent.name, p.name)
+        for p in TRAIN_DIR.rglob("*")
+        if p.is_file()
+    }
+
+    test_names = {
+        (p.parent.name, p.name)
+        for p in TEST_DIR.rglob("*")
+        if p.is_file()
+    }
+
+    overlap = train_names & test_names
+
+    if overlap:
+        raise RuntimeError(
+            f"Se detectaron {len(overlap)} imágenes repetidas entre train y test."
+        )
+
+    print("\n✅ Solapamiento entre train y test: 0")
 
 
 def preparar_dataset():
@@ -104,6 +134,8 @@ def preparar_dataset():
             total_original,
         ))
 
+    verificar_solapamiento()
+
     print("\n✅ Dataset preparado correctamente\n")
     print(f"{'Clase':<18} {'Train':>6} {'Test':>6} {'Usadas':>8} {'Originales':>10}")
     print("─" * 52)
@@ -117,6 +149,11 @@ def preparar_dataset():
 
     print("─" * 52)
     print(f"{'TOTAL':<18} {total_train:>6} {total_test:>6} {total_usado_global:>8}")
+
+    train_pct = total_train / total_usado_global * 100
+    test_pct = total_test / total_usado_global * 100
+
+    print(f"\n📊 Proporción real: {train_pct:.2f}% train / {test_pct:.2f}% test")
     print(f"\n📁 Train: {TRAIN_DIR}")
     print(f"📁 Test:  {TEST_DIR}")
 

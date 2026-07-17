@@ -1,5 +1,5 @@
 ,Black_rot,Esca,Healthy,Leaf_blight
-Black_rot,228,7,1,0
-Esca,8,265,3,1
+Black_rot,228,7,0,1
+Esca,11,263,2,1
 Healthy,0,0,85,0
 Leaf_blight,3,0,0,213

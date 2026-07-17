@@ -53,6 +53,11 @@ sys.path.insert(0, str(SRC_DIR))
 
 from mantenedor import (
     CLASS_NAMES,
+    M2_RF_CLASS_WEIGHT,
+    M2_RF_MAX_DEPTH,
+    M2_RF_MIN_SAMPLES_LEAF,
+    M2_RF_MIN_SAMPLES_SPLIT,
+    M2_RF_N_ESTIMATORS,
     M2_RF_REPORTS_DIR,
     RF_MODEL_PATH,
 )
@@ -607,11 +612,11 @@ def main() -> None:
     # 2. Construcción y entrenamiento
     # ─────────────────────────────────────────────
     modelo = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        class_weight=None,
+        n_estimators=M2_RF_N_ESTIMATORS,
+        max_depth=M2_RF_MAX_DEPTH,
+        min_samples_split=M2_RF_MIN_SAMPLES_SPLIT,
+        min_samples_leaf=M2_RF_MIN_SAMPLES_LEAF,
+        class_weight=M2_RF_CLASS_WEIGHT,
         n_jobs=-1,
         random_state=SEMILLA,
     )

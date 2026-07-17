@@ -34,11 +34,11 @@ def render():
         "🧠",
     )
 
-    best_model = st.session_state.get("best_model_name", "")
+    best_model = st.session_state.get("best_model_name", "") or ""
     best_clean = best_model.split(":")[1].strip() if ":" in best_model else best_model
 
-    model_status = st.session_state.get("model_status", {})
-    ranking    = st.session_state.get("ranking_data", [])
+    model_status = st.session_state.get("model_status", {}) or {}
+    ranking    = st.session_state.get("ranking_data", []) or []
 
     # ── Tarjetas de modelos: 3 columnas, componentes nativos ────────────────
     cols = st.columns(3)

@@ -18,6 +18,11 @@ SCALER_PATH = MODELS_DIR / "scaler.pkl"
 SVM_SCALER_PATH = MODELS_DIR / "scaler_svm.pkl"
 KNN_SCALER_PATH = MODELS_DIR / "scaler_knn.pkl"
 
+# ─── Rutas de modelos clásicos ──────────────────────────────────────────
+SVM_MODEL_PATH = MODELS_DIR / "svm_model.pkl"
+RF_MODEL_PATH = MODELS_DIR / "random_forest_model.pkl"
+KNN_MODEL_PATH = MODELS_DIR / "knn_model.pkl"
+
 
 REPORTS_DIR = BASE_DIR / "reports"
 EDA_DIR = REPORTS_DIR / "eda"
@@ -37,6 +42,24 @@ IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
 SEED = 42
 
+# ─── Hiperparámetros de modelos clásicos (fuente única) ────────────────
+M1_SVM_KERNEL = "rbf"
+M1_SVM_C = 10.0
+M1_SVM_GAMMA = "scale"
+M1_SVM_CLASS_WEIGHT = "balanced"
+
+M2_RF_N_ESTIMATORS = 200
+M2_RF_MAX_DEPTH = None
+M2_RF_MIN_SAMPLES_SPLIT = 2
+M2_RF_MIN_SAMPLES_LEAF = 1
+M2_RF_CLASS_WEIGHT = None
+
+M3_KNN_N_NEIGHBORS = 5
+M3_KNN_METRIC = "euclidean"
+M3_KNN_WEIGHTS = "distance"
+M3_KNN_ALGORITHM = "auto"
+M3_KNN_P = 2
+
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 MAX_IMAGES_PER_CLASS = None
@@ -53,6 +76,8 @@ CLASS_FOLDER_MAP = {
 
 CNN_EXTRACTOR_PATH = MODELS_DIR / "cnn_feature_extractor.h5"
 CNN_SVM_PATH = MODELS_DIR / "cnn_svm_model.pkl"
+TRANSFER_EXTRACTOR_PATH = MODELS_DIR / "transfer_feature_extractor.h5"
+TRANSFER_RF_PATH = MODELS_DIR / "transfer_random_forest_model.pkl"
 
 # ─── Directorios de reportes por modelo ────────────────────────────────
 M1_SVM_REPORTS_DIR = MODELOS_DIR / "m1_svm"

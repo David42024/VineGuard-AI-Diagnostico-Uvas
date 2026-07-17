@@ -1,7 +1,190 @@
 """Reusable UI components for VineGuard AI — native Streamlit only."""
 
+import os
+import subprocess
+import sys
 import streamlit as st
 import pandas as pd
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+MAX_LINES = 50
+
+
+def _stream_output(process: subprocess.Popen, output_box) -> list[str]:
+    """Lee stdout línea por línea y actualiza output_box con las últimas MAX_LINES."""
+    lineas: list[str] = []
+    if process.stdout is None:
+        return lineas
+    for raw in iter(process.stdout.readline, ""):
+        linea = raw.rstrip()
+        if not linea:
+            continue
+        lineas.append(linea)
+        output_box.code("\n".join(lineas[-MAX_LINES:]), language="text")
+    return lineas
+
+
+def run_script_button(
+    script_name: str,
+    button_label: str,
+    *,
+    confirm_message: str = "",
+    key: str = "",
+    heavy: bool = True,
+    reload_callback=None,
+    on_start=None,
+) -> bool:
+    """Botón que ejecuta un script Python con subprocess.Popen y salida progresiva.
+
+    Args:
+        script_name: Ruta relativa al script (ej. 'src/eda_validacion_datos.py')
+        button_label: Texto del botón
+        confirm_message: Mensaje de confirmación (vacío = sin confirmación)
+        key: Key única para el botón y estado
+        heavy: Si True, pide confirmación al usuario antes de ejecutar
+        reload_callback: Función a llamar tras éxito (para recargar datos)
+
+    Returns:
+        True si el script se ejecutó con éxito, False en otro caso.
+    """
+    running_key = f"_running_{key or script_name}"
+    is_running = st.session_state.get(running_key, False)
+
+    # Deshabilitar botones mientras corre cualquier proceso
+    any_running = any(
+        v for k, v in st.session_state.items()
+        if k.startswith("_running_") and v
+    )
+
+    if st.button(
+        button_label,
+        key=key or f"btn_{script_name}",
+        disabled=any_running,
+        use_container_width=True,
+        type="primary" if not any_running else "secondary",
+    ):
+        if heavy and confirm_message:
+            st.session_state[f"_confirm_{key or script_name}"] = True
+        else:
+            if on_start:
+                on_start()
+            st.session_state[running_key] = True
+            st.rerun()
+
+    # Confirmación
+    confirm_key = f"_confirm_{key or script_name}"
+    if st.session_state.get(confirm_key, False):
+        with st.expander("⚠️ Confirmar ejecución", expanded=True):
+            st.warning(confirm_message)
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Ejecutar", key=f"{key}_yes", type="primary"):
+                    st.session_state[confirm_key] = False
+                    if on_start:
+                        on_start()
+                    st.session_state[running_key] = True
+                    st.rerun()
+            with col2:
+                if st.button("❌ Cancelar", key=f"{key}_no"):
+                    st.session_state[confirm_key] = False
+                    st.rerun()
+
+    # Ejecución con salida progresiva
+    if is_running:
+        script_path = BASE_DIR / script_name
+        cmd_display = f"{sys.executable} {script_name}"
+
+        with st.status(
+            f"⏳ Iniciando **{button_label}**...",
+            expanded=True,
+        ) as status:
+            st.code(cmd_display, language="bash")
+            output_box = st.empty()
+
+            try:
+                process = subprocess.Popen(
+                    [sys.executable, str(script_path)],
+                    cwd=str(BASE_DIR),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
+                )
+
+                lineas = _stream_output(process, output_box)
+                return_code = process.wait()
+
+                if return_code == 0:
+                    status.update(
+                        label=f"✅ {button_label} completado",
+                        state="complete",
+                        expanded=False,
+                    )
+                    st.success(f"{button_label} finalizado correctamente.")
+                    st.session_state[running_key] = False
+                    if reload_callback:
+                        reload_callback()
+                    st.rerun()
+                    return True
+                else:
+                    status.update(
+                        label=f"❌ {button_label} — Error (código {return_code})",
+                        state="error",
+                        expanded=True,
+                    )
+                    st.error(f"El proceso terminó con código {return_code}.")
+                    st.session_state[running_key] = False
+                    return False
+
+            except FileNotFoundError:
+                status.update(label=f"❌ Script no encontrado", state="error")
+                st.error(f"No se encontró: `{script_path}`")
+                st.session_state[running_key] = False
+                return False
+            except Exception as e:
+                status.update(label=f"❌ Error inesperado", state="error")
+                st.error(f"{type(e).__name__}: {e}")
+                st.session_state[running_key] = False
+                return False
+
+    return False
+
+
+def reload_ranking_callback():
+    """Recarga ranking_data y best_model_name en session_state tras ejecutar scripts."""
+    import pandas as pd
+    ranking_path = BASE_DIR / "reports" / "modelos" / "ranking_modelos.csv"
+    best_path = BASE_DIR / "reports" / "modelos" / "mejor_modelo.txt"
+    try:
+        if ranking_path.exists():
+            df = pd.read_csv(ranking_path)
+            st.session_state.ranking_data = df.to_dict("records")
+        if best_path.exists():
+            with open(best_path, encoding="utf-8") as f:
+                st.session_state.best_model_name = f.read().strip()
+    except Exception:
+        pass
+
+
+def reload_ranking_callback():
+    """Recarga ranking_data y best_model_name en session_state tras ejecutar scripts."""
+    import pandas as pd
+    ranking_path = BASE_DIR / "reports" / "modelos" / "ranking_modelos.csv"
+    best_path = BASE_DIR / "reports" / "modelos" / "mejor_modelo.txt"
+    try:
+        if ranking_path.exists():
+            df = pd.read_csv(ranking_path)
+            st.session_state.ranking_data = df.to_dict("records")
+        if best_path.exists():
+            with open(best_path, encoding="utf-8") as f:
+                st.session_state.best_model_name = f.read().strip()
+    except Exception:
+        pass
 
 
 def metric_card(icon: str, title: str, value, subtitle: str = "",

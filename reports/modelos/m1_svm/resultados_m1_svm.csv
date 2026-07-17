@@ -1,2 +1,2 @@
 modelo,accuracy,balanced_accuracy,precision,recall,f1_score,mcc,auc_macro,auc_micro,tiempo_carga_preprocesamiento_features_s,tiempo_entrenamiento_s,tiempo_evaluacion_s,tiempo_inferencia_ms,tiempo_guardado_modelo_s,tiempo_total_proceso_s,n_muestras_train,n_muestras_test,n_features,model_size_mb,semilla,kernel,C,gamma,class_weight
-M1 — SVM (RBF),0.9717,0.9772,0.972,0.9717,0.9718,0.9608,0.9987,0.9991,191.65,7.29,1.88,0.9002,0.0046,200.83,6000,814,227,3.173,42,rbf,10.0,scale,balanced
+M1 — SVM (RBF),0.9693,0.9754,0.9695,0.9693,0.9693,0.9574,0.9988,0.9991,458.54,18.88,3.54,1.276,0.0105,480.98,6000,814,227,3.176,42,rbf,10.0,scale,balanced

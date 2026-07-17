@@ -50,6 +50,10 @@ sys.path.insert(
 
 from mantenedor import (
     CLASS_NAMES,
+    M1_SVM_C,
+    M1_SVM_CLASS_WEIGHT,
+    M1_SVM_GAMMA,
+    M1_SVM_KERNEL,
     M1_SVM_REPORTS_DIR,
     SVM_MODEL_PATH,
     SVM_SCALER_PATH,
@@ -521,11 +525,11 @@ def main() -> None:
     # 2. Entrenamiento
     # ─────────────────────────────────────────────
     modelo = SVC(
-        kernel="rbf",
-        C=10.0,
-        gamma="scale",
+        kernel=M1_SVM_KERNEL,
+        C=M1_SVM_C,
+        gamma=M1_SVM_GAMMA,
         probability=True,
-        class_weight="balanced",
+        class_weight=M1_SVM_CLASS_WEIGHT,
         random_state=SEMILLA,
         verbose=False,
     )
