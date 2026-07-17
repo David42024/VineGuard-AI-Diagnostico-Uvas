@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toast";
+import { Chatbot } from "@/components/Chatbot/Chatbot";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          <Chatbot />
         </ThemeProvider>
       </body>
     </html>

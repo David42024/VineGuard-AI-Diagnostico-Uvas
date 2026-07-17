@@ -28,6 +28,21 @@ export type {
   ApiError,
 } from "@/types/api";
 
+// Tipos para el chatbot
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[];
+  language?: string;
+}
+
+export interface ChatResponse {
+  response: string;
+}
+
 // Legacy aliases for existing component imports
 export type { DiagnosisResponse as Diagnosis } from "@/types/api";
 export type { ConsensusInfo as Consensus } from "@/types/api";
@@ -50,5 +65,13 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Funciones del chatbot
+export const chatbotApi = {
+  sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
+    const response = await api.post<ChatResponse>("/chatbot/chat", request);
+    return response.data;
+  },
+};
 
 export default api;

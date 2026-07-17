@@ -1,0 +1,171 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+
+router = APIRouter(prefix="/api/v1/chatbot", tags=["chatbot"])
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" o "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    language: Optional[str] = "es"
+
+
+class ChatResponse(BaseModel):
+    response: str
+
+
+def generate_response(messages: List[ChatMessage], language: str) -> str:
+    """
+    Genera una respuesta instantánea y flexible para el chatbot.
+    """
+    if not messages:
+        if language == "es":
+            return "¡Hola! Soy VineGuard AI, tu asistente virtual especializado en el diagnóstico de enfermedades de las uvas. ¿En qué puedo ayudarte hoy?"
+        else:
+            return "Hello! I'm VineGuard AI, your virtual assistant specialized in grape disease diagnosis. How can I help you today?"
+
+    last_message = messages[-1].content.lower()
+
+    if language == "es":
+        # Saludos
+        if any(greeting in last_message for greeting in [
+            "hola", "hello", "hi", "buenos días", "buenas tardes", "buenas noches",
+            "qué tal", "cómo estás", "holi", "holis", "holaaaa", "hola ia"
+        ]):
+            return "¡Hola! ¿En qué puedo ayudarte con el diagnóstico de enfermedades de las uvas?"
+        
+        # Preguntas sobre cómo diagnosticar / analizar / evaluar
+        elif any(keyword in last_message for keyword in [
+            "diagnóstico", "diagnosis", "diagnosticar", "analizar", "analizo", "analizar",
+            "evaluo", "evaluar", "saber si", "cómo sé", "mi hoja tiene", "tiene enfermedad",
+            "detectar", "reconocer", "qué tiene", "qué pasa con", "como veo", "cómo veo",
+            "como se si", "cómo se si", "esta enferma", "está enferma", "enferma", "lo analizo",
+            "como lo analizo", "cómo lo analizo"
+        ]):
+            return "Para realizar un diagnóstico, ve a la sección 'Nuevo Diagnóstico' en la aplicación, sube una foto clara de una hoja o racimo de uva y haz clic en 'Analizar hoja'. La IA analizará la imagen y te dará un resultado con la predicción de la enfermedad (si la hay) y el nivel de riesgo."
+        
+        # Preguntas sobre precisión / exactitud de predicciones
+        elif any(keyword in last_message for keyword in [
+            "predicciones son", "prediccion es", "precisa", "preciso", "exacta", "exacto",
+            "fiable", "fiables", "confiable", "confiables", "qué tan", "qué tan preciso",
+            "qué tan exacto", "qué tan fiable", "qué tan confiable", "son exactas",
+            "son precisas", "son fiables", "son confiables"
+        ]):
+            return ("Las predicciones de VineGuard AI son muy precisas, pero siempre es importante:\n"
+                    "- 📸 Usar fotos claras y bien iluminadas\n"
+                    "- 🧑‍🌭 Consultar a un especialista (ingeniero agrónomo o fitosanitario) para confirmar diagnósticos importantes\n\n"
+                    "Recuerda que esto es una herramienta de apoyo, no reemplaza el juicio profesional!")
+        
+        # Preguntas sobre enfermedades
+        elif any(keyword in last_message for keyword in [
+            "enfermedad", "disease", "enfermedades", "diseases", "qué enfermedades",
+            "detectas", "puedes detectar", "detectan", "qué detectas"
+        ]):
+            return "VineGuard AI puede detectar varias enfermedades comunes en las uvas, entre ellas: Podredumbre Negra (Black Rot), Esca, Tizón de la Hoja (Leaf Blight), Mildiu, Oídio y Botrytis."
+        
+        # Preguntas sobre reportes
+        elif any(keyword in last_message for keyword in [
+            "reporte", "report", "reportes", "reports", "descargar reporte",
+            "generar reporte", "cómo descargo", "cómo genero"
+        ]):
+            return "Puedes generar y descargar reportes detallados en formatos Word (.docx), PDF y Excel (.xlsx) desde la sección 'Reportes' de la aplicación."
+        
+        # Preguntas sobre qué preguntar / ayuda general
+        elif any(keyword in last_message for keyword in [
+            "qué te puedo preguntar", "qué puedo preguntarte", "qué puedes hacer",
+            "ayuda", "help", "cómo funciona", "para qué sirves", "qué haces"
+        ]):
+            return ("Puedes preguntarme sobre:\n"
+                    "- 📸 Cómo diagnosticar enfermedades en tus hojas de uva\n"
+                    "- 🦠 Qué enfermedades podemos detectar\n"
+                    "- 📄 Cómo generar y descargar reportes\n"
+                    "- 💡 Cualquier duda sobre cómo usar la aplicación\n\n"
+                    "¿Por dónde quieres empezar?")
+        
+        # Preguntas genéricas
+        else:
+            return ("Gracias por tu pregunta! Recuerda que puedo ayudarte con:\n"
+                    "- Cómo diagnosticar enfermedades en las uvas\n"
+                    "- Qué enfermedades detectamos\n"
+                    "- Cómo generar reportes\n"
+                    "- Precisión de las predicciones\n\n"
+                    "¿Tienes alguna duda específica?")
+    else:
+        # Saludos
+        if any(greeting in last_message for greeting in [
+            "hola", "hello", "hi", "good morning", "good afternoon", "good evening",
+            "hey", "how are you", "what's up"
+        ]):
+            return "Hello! How can I help you with grape disease diagnosis?"
+        
+        # Preguntas sobre cómo diagnosticar / analizar / evaluar
+        elif any(keyword in last_message for keyword in [
+            "diagnóstico", "diagnosis", "diagnosticar", "analyze", "how do i",
+            "how to", "evaluate", "check if", "my leaf has", "has disease",
+            "detect", "recognize", "what's wrong with"
+        ]):
+            return "To perform a diagnosis, go to the 'New Diagnosis' section in the app, upload a clear photo of a grape leaf or cluster, and click 'Analyze leaf'. The AI will analyze the image and give you a result with the disease prediction (if any) and risk level."
+        
+        # Preguntas sobre precisión / exactitud de predicciones
+        elif any(keyword in last_message for keyword in [
+            "predictions are", "prediction is", "accurate", "accurately", "reliable",
+            "how accurate", "how reliable", "trustworthy", "are they accurate",
+            "are they reliable"
+        ]):
+            return ("VineGuard AI predictions are very accurate, but it's always important to:\n"
+                    "- 📸 Use clear, well-lit photos\n"
+                    "- 🧑‍🌭 Consult a specialist (agronomist or phytosanitary expert) to confirm important diagnoses\n\n"
+                    "Remember this is a support tool, it doesn't replace professional judgment!")
+        
+        # Preguntas sobre enfermedades
+        elif any(keyword in last_message for keyword in [
+            "enfermedad", "disease", "enfermedades", "diseases", "what diseases",
+            "can you detect", "do you detect"
+        ]):
+            return "VineGuard AI can detect several common grape diseases, including: Black Rot, Esca, Leaf Blight, Downy Mildew, Powdery Mildew, and Botrytis."
+        
+        # Preguntas sobre reportes
+        elif any(keyword in last_message for keyword in [
+            "reporte", "report", "reportes", "reports", "download report",
+            "generate report", "how do i download", "how do i generate"
+        ]):
+            return "You can generate and download detailed reports in Word (.docx), PDF, and Excel (.xlsx) formats from the 'Reports' section of the application."
+        
+        # Preguntas sobre qué preguntar / ayuda general
+        elif any(keyword in last_message for keyword in [
+            "what can i ask you", "what can you do", "help", "how does this work",
+            "what do you do", "what is this for"
+        ]):
+            return ("You can ask me about:\n"
+                    "- 📸 How to diagnose diseases on your grape leaves\n"
+                    "- 🦠 What diseases we can detect\n"
+                    "- 📄 How to generate and download reports\n"
+                    "- 💡 Any questions about how to use the app\n\n"
+                    "Where do you want to start?")
+        
+        # Preguntas genéricas
+        else:
+            return ("Thanks for your question! Remember I can help you with:\n"
+                    "- How to diagnose grape diseases\n"
+                    "- What diseases we detect\n"
+                    "- How to generate reports\n"
+                    "- Prediction accuracy\n\n"
+                    "Do you have any specific questions?")
+
+
+@router.post("/chat", response_model=ChatResponse)
+def chat(request: ChatRequest):
+    """
+    Endpoint para interactuar con el chatbot de VineGuard AI (respuesta instantánea).
+    """
+    try:
+        language = request.language if request.language in ["es", "en"] else "es"
+        response_text = generate_response(request.messages, language)
+        return ChatResponse(response=response_text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en el chatbot: {str(e)}")

@@ -21,7 +21,7 @@ from backend.core.config import settings
 from backend.database.database import init_db
 from backend.database.session import SessionLocal, engine
 
-from backend.api import auth, diagnosis, models, pipeline, statistics, reports, users
+from backend.api import auth, diagnosis, models, pipeline, statistics, reports, users, chatbot
 
 
 def _check_alembic_revision():
@@ -127,6 +127,7 @@ app.include_router(pipeline.router)
 app.include_router(statistics.router)
 app.include_router(reports.router)
 app.include_router(users.router)
+app.include_router(chatbot.router)
 
 
 @app.exception_handler(HTTPException)

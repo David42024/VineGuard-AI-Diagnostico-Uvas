@@ -52,5 +52,13 @@
   "disease.esca": "Esca",
   "disease.healthy": "Sana",
   "disease.leaf_blight": "Tizón de la Hoja",
-  "disclaimer": "Este resultado es una estimación generada por inteligencia artificial y no reemplaza la evaluación de un ingeniero agrónomo o especialista fitosanitario."
+  "disclaimer": "Este resultado es una estimación generada por inteligencia artificial y no reemplaza la evaluación de un ingeniero agrónomo o especialista fitosanitario.",
+  "chatbot.title": "Asistente VineGuard",
+  "chatbot.placeholder": "Escribe tu pregunta...",
+  "chatbot.send": "Enviar",
+  "chatbot.voice.start": "Hablar",
+  "chatbot.voice.stop": "Detener",
+  "chatbot.voice.listening": "Escuchando...",
+  "chatbot.voice.notSupported": "Tu navegador no soporta reconocimiento de voz",
+  "chatbot.error": "Error al comunicarse con el asistente"
 }

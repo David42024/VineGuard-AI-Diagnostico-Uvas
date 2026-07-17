@@ -52,5 +52,13 @@
   "disease.esca": "Esca",
   "disease.healthy": "Healthy",
   "disease.leaf_blight": "Leaf Blight",
-  "disclaimer": "This result is an AI-generated estimate and does not replace the evaluation of an agronomist or phytosanitary specialist."
+  "disclaimer": "This result is an AI-generated estimate and does not replace the evaluation of an agronomist or phytosanitary specialist.",
+  "chatbot.title": "VineGuard Assistant",
+  "chatbot.placeholder": "Type your question...",
+  "chatbot.send": "Send",
+  "chatbot.voice.start": "Speak",
+  "chatbot.voice.stop": "Stop",
+  "chatbot.voice.listening": "Listening...",
+  "chatbot.voice.notSupported": "Your browser does not support voice recognition",
+  "chatbot.error": "Error communicating with the assistant"
 }
