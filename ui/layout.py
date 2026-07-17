@@ -15,7 +15,6 @@ NAV_ITEMS = [
     {"id": "stats_tests", "label_es": "📈 Pruebas Estadísticas",      "label_en": "📈 Statistical Tests",      "label_pt": "📈 Testes Estatísticos"},
     {"id": "comparison",  "label_es": "🏆 Comparación de Modelos",    "label_en": "🏆 Model Comparison",       "label_pt": "🏆 Comparação de Modelos"},
     {"id": "best_model",  "label_es": "⭐ Mejor Modelo",              "label_en": "⭐ Best Model",             "label_pt": "⭐ Melhor Modelo"},
-    {"id": "reports",     "label_es": "📄 Reportes",                  "label_en": "📄 Reports",                "label_pt": "📄 Relatórios"},
 ]
 
 

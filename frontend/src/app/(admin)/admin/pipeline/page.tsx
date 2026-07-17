@@ -50,7 +50,7 @@ const defaultStages: PipelineStageData[] = [
   {
     label: "Entrenamiento de Modelos",
     status: "running",
-    detail: "EfficientNet-B3 en entrenamiento (época 42/100)",
+    detail: "M1 - SVM en entrenamiento (época 42/100)",
     icon: Brain,
   },
   {

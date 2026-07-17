@@ -171,22 +171,6 @@ def reload_ranking_callback():
         pass
 
 
-def reload_ranking_callback():
-    """Recarga ranking_data y best_model_name en session_state tras ejecutar scripts."""
-    import pandas as pd
-    ranking_path = BASE_DIR / "reports" / "modelos" / "ranking_modelos.csv"
-    best_path = BASE_DIR / "reports" / "modelos" / "mejor_modelo.txt"
-    try:
-        if ranking_path.exists():
-            df = pd.read_csv(ranking_path)
-            st.session_state.ranking_data = df.to_dict("records")
-        if best_path.exists():
-            with open(best_path, encoding="utf-8") as f:
-                st.session_state.best_model_name = f.read().strip()
-    except Exception:
-        pass
-
-
 def metric_card(icon: str, title: str, value, subtitle: str = "",
                 color: str = "green", help_text: str = ""):
     """Metric card usando st.metric() nativo de Streamlit (sin HTML)."""

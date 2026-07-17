@@ -433,46 +433,6 @@ def tamano_efecto(y_true, predicciones, nombres):
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  6. DIEBOLD-MARIANO (COMPLEMENTARIO)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def diebold_mariano_complementario(y_true, predicciones, nombres):
-    print("\n" + "=" * 60)
-    print("  6. DIEBOLD-MARIANO (Complementario — no es la prueba principal)")
-    print("=" * 60)
-    print("""
-   NOTA: Diebold-Mariano se diseñó para comparar precisión de pronósticos
-   en series temporales. En clasificación de imágenes NO es la prueba
-   recomendada. Se incluye aquí solo como análisis complementario.
-
-   Las pruebas principales para este proyecto son:
-     • McNemar (comparación por pares)
-     • Cochran's Q (comparación simultánea)
-     • Post-hoc McNemar con corrección Holm
-     • Intervalos de confianza bootstrap estratificado
-     • MCC y matriz de confusión
-  """)
-    # Implementación adaptada: comparación de errores cuadráticos
-    resultados = []
-    for (n1, p1), (n2, p2) in combinations(zip(nombres, [predicciones[n] for n in nombres]), 2):
-        err1 = (y_true != p1).astype(float)
-        err2 = (y_true != p2).astype(float)
-        d = err1 - err2
-        mean_d = np.mean(d)
-        var_d = np.var(d, ddof=1) if len(d) > 1 else 0
-        dm_stat = mean_d / np.sqrt(var_d / len(d)) if var_d > 0 else 0
-        p_val = 2 * (1 - stats.norm.cdf(abs(dm_stat)))
-        resultados.append({
-            "modelo_1": n1, "modelo_2": n2,
-            "DM_statistic": round(dm_stat, 4), "p_value": round(p_val, 4),
-        })
-        print(f"  {n1} vs {n2}: DM={dm_stat:.4f}, p={p_val:.4f}")
-    df = pd.DataFrame(resultados)
-    df.to_csv(ESTADISTICA_DIR / "diebold_mariano_complementario.csv", index=False)
-    print(f"  ✅ Guardado (complementario): {ESTADISTICA_DIR / 'diebold_mariano_complementario.csv'}")
-    return df
-
 
 def main():
     print("\n" + "=" * 60)
@@ -507,9 +467,6 @@ def main():
 
     # 5. Tamaño del efecto
     tamano_efecto(y_true, predicciones, nombres)
-
-    # 6. Diebold-Mariano (complementario)
-    diebold_mariano_complementario(y_true, predicciones, nombres)
 
     print("\n" + "=" * 60)
     print("  ✅ Validación estadística completada")

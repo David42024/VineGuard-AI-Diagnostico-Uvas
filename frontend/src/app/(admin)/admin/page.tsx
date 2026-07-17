@@ -73,9 +73,9 @@ export default function AdminDashboard() {
     setError("");
     try {
       const [statsRes, diagRes, usersRes] = await Promise.all([
-        api.get("/statistics/summary"),
-        api.get("/diagnoses?limit=10"),
-        api.get("/users"),
+        api.get("/statistics/summary").catch(() => ({ data: { general_stats: {}, disease_distribution: {}, diagnostics_by_date: [], ranking: [], cross_validation: [] } })),
+        api.get("/diagnoses?limit=10").catch(() => ({ data: { items: [] } })),
+        api.get("/users").catch(() => ({ data: [] })),
       ]);
 
       setDiagnostics(diagRes.data?.items || []);

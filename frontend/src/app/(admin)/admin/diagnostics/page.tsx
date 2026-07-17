@@ -47,7 +47,7 @@ const mockData: DiagnosisRow[] = Array.from({ length: 25 }, (_, i) => ({
   filename: `hoja_${String(i + 1).padStart(3, "0")}.jpg`,
   user: i % 3 === 0 ? "Admin" : `Cliente ${(i % 5) + 1}`,
   date: new Date(Date.now() - 86400000 * i),
-  model: ["EfficientNet", "ResNet50", "ViT"][i % 3],
+  model: ["M1 - SVM", "M2 - Random Forest", "M3 - KNN"][i % 3],
   prediction: ["Sana", "Podredumbre Negra", "Esca", "Tizón de la Hoja"][i % 4],
   confidence: 0.85 + Math.random() * 0.14,
   status: i === 4 ? "processing" : "completed",

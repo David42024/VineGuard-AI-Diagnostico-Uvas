@@ -1,0 +1,11 @@
+b,c,statistic,p_value,metodo,interpretation,modelo_1,modelo_2
+20,16,0.25,0.6170750774519739,chi-cuadrado con corrección,No hay diferencia significativa (p >= 0.05),M1 - SVM,M2 - Random Forest
+21,11,2.53125,0.11161176829829161,chi-cuadrado con corrección,No hay diferencia significativa (p >= 0.05),M1 - SVM,M3 - KNN
+6,23,8.827586206896552,0.0029671058986476154,chi-cuadrado con corrección,Diferencia muy significativa (p < 0.01),M1 - SVM,H1 - CNN+SVM
+33,23,1.4464285714285714,0.22910188406505527,chi-cuadrado con corrección,No hay diferencia significativa (p >= 0.05),M1 - SVM,H2 - MobileNetV2+RF
+24,18,0.5952380952380952,0.4404006981390033,chi-cuadrado con corrección,No hay diferencia significativa (p >= 0.05),M2 - Random Forest,M3 - KNN
+7,28,11.428571428571429,0.0007232327164301936,chi-cuadrado con corrección,Diferencia altamente significativa (p < 0.001),M2 - Random Forest,H1 - CNN+SVM
+33,27,0.4166666666666667,0.5186050164287255,chi-cuadrado con corrección,No hay diferencia significativa (p >= 0.05),M2 - Random Forest,H2 - MobileNetV2+RF
+6,33,17.333333333333332,3.136368144425899e-05,chi-cuadrado con corrección,Diferencia altamente significativa (p < 0.001),M3 - KNN,H1 - CNN+SVM
+32,32,0.015625,0.9005235503397742,chi-cuadrado con corrección,No hay diferencia significativa (p >= 0.05),M3 - KNN,H2 - MobileNetV2+RF
+35,8,15.720930232558139,7.340738534732004e-05,chi-cuadrado con corrección,Diferencia altamente significativa (p < 0.001),H1 - CNN+SVM,H2 - MobileNetV2+RF
