@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-import type { ErrorDetail } from "@/types/api";
+import type { ErrorDetail, ModelInfo, ModelRanking, BestModelResponse } from "@/types/api";
 
 // Re-export all canonical types
 export type {
@@ -70,6 +70,22 @@ api.interceptors.response.use(
 export const chatbotApi = {
   sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
     const response = await api.post<ChatResponse>("/chatbot/chat", request);
+    return response.data;
+  },
+};
+
+// Funciones de modelos
+export const modelsApi = {
+  list: async (): Promise<ModelInfo[]> => {
+    const response = await api.get<ModelInfo[]>("/models");
+    return response.data;
+  },
+  getRanking: async (): Promise<ModelRanking[]> => {
+    const response = await api.get<ModelRanking[]>("/models/ranking");
+    return response.data;
+  },
+  getBest: async (): Promise<BestModelResponse> => {
+    const response = await api.get<BestModelResponse>("/models/best");
     return response.data;
   },
 };

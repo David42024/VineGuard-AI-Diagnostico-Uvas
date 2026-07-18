@@ -4,17 +4,18 @@ import { useState } from "react";
 import { UploadZone } from "@/components/diagnosis/upload-zone";
 import { ResultCard } from "@/components/diagnosis/result-card";
 import { ConsensusView } from "@/components/diagnosis/consensus-view";
+import { ComparisonView } from "@/components/diagnosis/comparison-view";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Search,
   Brain,
+  Star,
   GitBranch,
-  Cpu,
+  LayoutDashboard,
   Loader2,
   Download,
   RotateCcw,
@@ -24,7 +25,35 @@ import {
 import api from "@/lib/api";
 import type { Diagnosis } from "@/lib/api";
 
-type ModelKey = "consensus" | "modelo_svm" | "modelo_rf" | "modelo_cnn" | "modelo_ensemble" | "modelo_resnet";
+type ModelKey = "consensus" | "best_model" | "compare_all";
+
+interface ModeOption {
+  key: ModelKey;
+  icon: typeof Brain;
+  label: string;
+  description: string;
+}
+
+const MODES: ModeOption[] = [
+  {
+    key: "consensus",
+    icon: GitBranch,
+    label: "Consenso",
+    description: "Combina resultados de múltiples modelos",
+  },
+  {
+    key: "best_model",
+    icon: Star,
+    label: "Mejor Modelo",
+    description: "Usa el modelo con mejor rendimiento",
+  },
+  {
+    key: "compare_all",
+    icon: LayoutDashboard,
+    label: "Comparar Todos",
+    description: "Ejecuta todos los modelos y compara sus predicciones",
+  },
+];
 
 export default function DiagnosisPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -61,18 +90,27 @@ export default function DiagnosisPage() {
     }, 500);
 
     try {
+      let key: string;
+      if (modelKey === "best_model") {
+        key = "H1";
+      } else {
+        key = "consensus";
+      }
+
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("model_key", modelKey);
+      formData.append("model_key", key);
 
       const response = await api.post<Diagnosis>("/diagnoses", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setResult(response.data);
       toast.success("Diagnóstico completado exitosamente");
-    } catch {
-      setError("Error al procesar la imagen. Intente nuevamente.");
-      toast.error("Error al realizar el diagnóstico");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Error al procesar la imagen. Intente nuevamente.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       clearInterval(interval);
       setProgress(100);
@@ -154,33 +192,40 @@ const handleDownload = async () => {
             </CardHeader>
             <CardContent>
               <div className="grid gap-3">
-                <button
-                  onClick={() => setModelKey("consensus")}
-                  className={`flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
-                    modelKey === "consensus"
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-muted-foreground/30"
-                  }`}
-                >
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                      modelKey === "consensus"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                  >
-                    <GitBranch className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Consenso</p>
-                    <p className="text-xs text-muted-foreground">
-                      Combina resultados de múltiples modelos
-                    </p>
-                  </div>
-                  {modelKey === "consensus" && (
-                    <Badge variant="success">Seleccionado</Badge>
-                  )}
-                </button>
+                {MODES.map((mode) => {
+                  const Icon = mode.icon;
+                  const selected = modelKey === mode.key;
+                  return (
+                    <button
+                      key={mode.key}
+                      onClick={() => setModelKey(mode.key)}
+                      className={`flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/5"
+                          : "hover:border-muted-foreground/30"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                          selected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{mode.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {mode.description}
+                        </p>
+                      </div>
+                      {selected && (
+                        <Badge variant="success">Seleccionado</Badge>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -225,7 +270,12 @@ const handleDownload = async () => {
           {result && (
             <>
               <ResultCard diagnosis={result} />
-              {result.consensus && <ConsensusView consensus={result.consensus} />}
+              {modelKey === "consensus" && result.consensus && (
+                <ConsensusView consensus={result.consensus} />
+              )}
+              {modelKey === "compare_all" && result.predictions && result.predictions.length > 0 && (
+                <ComparisonView predictions={result.predictions} />
+              )}
 
               <Card>
                 <CardContent className="p-4">

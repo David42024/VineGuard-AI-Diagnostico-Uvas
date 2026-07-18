@@ -1,0 +1,15 @@
+Mejor modelo seleccionado: H1 - CNN+SVM
+
+Accuracy: 0.9890
+F1-macro: 0.9912
+MCC: 0.9847
+
+Criterio de selección:
+- Mayor MCC en el conjunto TEST.
+- F1-macro utilizado como segundo criterio.
+- Accuracy utilizada como tercer criterio.
+
+Respaldo estadístico:
+- Comparaciones significativas con corrección de Holm: 4.
+
+El modelo fue persistido para realizar inferencias sin volver a entrenarlo.

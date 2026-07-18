@@ -20,9 +20,10 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
     total_models,
   } = consensus;
 
-  const agreementPercent = agreement_level != null
-    ? parseFloat(agreement_level.replace("%", ""))
-    : 0;
+  const agreementPercent =
+    agreeing_models != null && total_models != null && total_models > 0
+      ? (agreeing_models / total_models) * 100
+      : 0;
   const highAgreement = agreementPercent >= 80;
 
   return (

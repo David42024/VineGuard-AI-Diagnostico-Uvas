@@ -42,7 +42,7 @@ const mockHistory: HistoryItem[] = Array.from({ length: 15 }, (_, i) => ({
   id: i + 1,
   filename: `hoja_${String(i + 1).padStart(3, "0")}.jpg`,
   date: new Date(Date.now() - 86400000 * i),
-  model: ["EfficientNet", "ResNet50", "ViT"][i % 3],
+  model: ["M1 - SVM", "M2 - Random Forest", "M3 - KNN"][i % 3],
   prediction: ["Sana", "Podredumbre Negra", "Esca"][i % 3],
   confidence: 0.85 + Math.random() * 0.14,
   health_status: i % 3 === 0 ? "healthy" : "diseased",

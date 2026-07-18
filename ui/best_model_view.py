@@ -64,7 +64,16 @@ def render():
     best_name = st.session_state.get("best_model_name", "") or ""
     ranking = st.session_state.get("ranking_data", []) or []
 
-    model_final_json = Path("reports/modelos/modelo_final.json")
+    # Extraer nombre corto del modelo desde el texto de justificación
+    _short_name = ""
+    if best_name and best_name.startswith("Mejor modelo seleccionado:"):
+        _short_name = best_name.split("Mejor modelo seleccionado:")[1].split("\n")[0].strip()
+    elif best_name and "\n" not in best_name:
+        _short_name = best_name
+
+    model_final_json = Path("models/modelo_final/modelo_final.json")
+    if not model_final_json.exists():
+        model_final_json = Path("reports/modelos/modelo_final.json")
     mejor_modelo_txt = Path("reports/modelos/mejor_modelo.txt")
 
     modelo_info = {}
@@ -78,17 +87,18 @@ def render():
 
     if not modelo_info:
         modelo_info = {
-            "name": best_name,
+            "name": _short_name or best_name,
             "accuracy": None,
             "f1_macro": None,
             "mcc": None,
             "artifacts": [],
             "selection_criteria": _t("No disponible", "Not available", "Indisponível"),
         }
+        match_name = _short_name or best_name
         for r in ranking:
-            if best_name and best_name in r.get("modelo", ""):
+            if match_name and (r.get("modelo", "") in match_name):
                 modelo_info["accuracy"] = r.get("accuracy")
-                modelo_info["f1_macro"] = r.get("f1_score")
+                modelo_info["f1_macro"] = r.get("f1_macro") or r.get("f1_score")
                 modelo_info["mcc"] = r.get("mcc")
                 break
 

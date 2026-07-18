@@ -43,8 +43,6 @@ class ReportRepository:
     def get_effect_size(self) -> Optional[list[dict]]:
         return self._read_csv(ESTADISTICA_DIR / "tamano_efecto.csv")
 
-    def get_diebold_mariano(self) -> Optional[list[dict]]:
-        return self._read_csv(ESTADISTICA_DIR / "diebold_mariano_complementario.csv")
 
     def get_bootstrap_intervals(self) -> Optional[list[dict]]:
         return self._read_csv(ESTADISTICA_DIR / "intervalos_confianza_bootstrap.csv")

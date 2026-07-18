@@ -46,7 +46,6 @@ def get_model_comparison(current_user: TokenData = Depends(get_current_user)):
     return {
         "ranking": report_repo.get_model_comparison_ranking(),
         "effect_size": report_repo.get_effect_size(),
-        "diebold_mariano": report_repo.get_diebold_mariano(),
     }
 
 
