@@ -447,13 +447,10 @@ def main():
     print(f"\n📊 Total muestras de prueba: {len(y_true)}")
     print(f"📊 Modelos disponibles: {', '.join(nombres)}")
 
-    # 1. McNemar
-    ejecutar_mcnemar(y_true, predicciones, nombres)
-
-    # 2. Cochran's Q
+    # 1. Cochran's Q
     resultado_cochran = cochran_q_test(y_true, predicciones, nombres)
 
-    # 3. Post-hoc McNemar con corrección Holm (solo si Cochran Q es significativo)
+    # 2. Post-hoc McNemar con corrección Holm (solo si Cochran Q es significativo)
     if resultado_cochran["p_value"] < ALPHA:
         posthoc_mcnemar_holm(y_true, predicciones, nombres)
     else:
@@ -462,10 +459,10 @@ def main():
             "El post-hoc McNemar-Holm no se ejecutará."
         )
 
-    # 4. Bootstrap CI estratificado
+    # 3. Bootstrap CI estratificado
     bootstrap_ci_estratificado(y_true, predicciones, nombres)
 
-    # 5. Tamaño del efecto
+    # 4. Tamaño del efecto
     tamano_efecto(y_true, predicciones, nombres)
 
     print("\n" + "=" * 60)

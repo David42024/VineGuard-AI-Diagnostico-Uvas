@@ -1,9 +1,12 @@
-"""Model comparison view — ranking by MCC, F1, Accuracy with charts."""
+"""Model comparison view — ranking by MCC, F1-macro, Accuracy with charts."""
 
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button, reload_ranking_callback
+from ui.components import section_header, empty_state, info_box, run_script_button
+
+COMP_DIR = Path("reports/modelos/comparativos")
+REPORTS_DIR = Path("reports/modelos")
 
 
 def _t(es: str, en: str, pt: str) -> str:
@@ -20,84 +23,201 @@ def _fmt_metric(val) -> str:
         return str(val)
 
 
+def _load_comparison() -> pd.DataFrame | None:
+    p = COMP_DIR / "comparacion_general_modelos.csv"
+    if not p.exists():
+        return None
+    try:
+        return pd.read_csv(p)
+    except Exception:
+        return None
+
+
+def _load_f1_por_clase() -> pd.DataFrame | None:
+    p = COMP_DIR / "comparacion_f1_por_clase.csv"
+    if not p.exists():
+        return None
+    try:
+        return pd.read_csv(p)
+    except Exception:
+        return None
+
+
 def render():
     lang = st.session_state.get("language", "es")
     section_header(
         _t("Comparación de Modelos", "Model Comparison", "Comparação de Modelos"),
-        _t("Ranking completo ordenado por MCC, F1-macro y Accuracy", "Full ranking sorted by MCC, F1-macro and Accuracy", "Ranking completo ordenado por MCC, F1-macro e Acurácia"),
+        _t("Ranking completo ordenado por MCC, F1-macro y Accuracy",
+          "Full ranking sorted by MCC, F1-macro and Accuracy",
+          "Ranking completo ordenado por MCC, F1-macro e Acurácia"),
         "🏆",
     )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        run_script_button(
-            "src/evaluacion_comparativa.py",
-            _t("🏆 Comparar modelos", "🏆 Compare models", "🏆 Comparar modelos"),
-            key="run_comparison",
-            confirm_message=_t(
-                "¿Ejecutar evaluación comparativa de todos los modelos?",
-                "Run comparative evaluation of all models?",
-                "Executar avaliação comparativa de todos os modelos?",
-            ),
-            reload_callback=reload_ranking_callback,
-        )
-    with col2:
-        run_script_button(
-            "src/seleccion_mejor_modelo.py",
-            _t("⭐ Seleccionar mejor modelo", "⭐ Select best model", "⭐ Selecionar melhor modelo"),
-            key="run_select_best",
-            reload_callback=reload_ranking_callback,
-        )
+    run_script_button(
+        "src/evaluacion_comparativa.py",
+        _t("🏆 Actualizar comparación", "🏆 Update comparison", "🏆 Atualizar comparação"),
+        key="run_comparison",
+        confirm_message=_t(
+            "¿Ejecutar evaluación comparativa de todos los modelos?",
+            "Run comparative evaluation of all models?",
+            "Executar avaliação comparativa de todos os modelos?",
+        ),
+        reload_callback=_reload_ranking,
+    )
 
-    ranking = st.session_state.get("ranking_data", []) or []
-    if not ranking:
-        empty_state("🏆", _t("Ranking no disponible", "Ranking not available", "Ranking indisponível"),
-                     _t("Ejecuta src/seleccion_mejor_modelo.py para generar el ranking.", "Run src/seleccion_mejor_modelo.py to generate the ranking.", "Execute src/seleccion_mejor_modelo.py para gerar o ranking."))
+    df = _load_comparison()
+    if df is None or df.empty:
+        empty_state(
+            "🏆",
+            _t("Ranking no disponible", "Ranking not available", "Ranking indisponível"),
+            _t("Ejecuta la comparación de modelos para generar el ranking.",
+              "Run model comparison to generate the ranking.",
+              "Execute a comparação de modelos para gerar o ranking."),
+        )
         return
 
-    df = pd.DataFrame(ranking)
+    # ── Orden consistente con el CSV: MCC → F1 → Accuracy ──────────
     sort_cols = [c for c in ["mcc", "f1_score", "accuracy"] if c in df.columns]
-
-    st.markdown(f"### {_t('Ranking de Modelos', 'Model Ranking', 'Ranking de Modelos')}")
     if sort_cols:
-        df_sorted = df.sort_values(by=sort_cols, ascending=False).reset_index(drop=True)
-        df_sorted.index = df_sorted.index + 1
-        df_sorted.index.name = "#"
+        df = df.sort_values(by=sort_cols, ascending=False).reset_index(drop=True)
 
-        display_cols = [c for c in ["modelo", "accuracy", "f1_score", "mcc", "precision", "recall"] if c in df_sorted.columns]
-        if display_cols:
-            st.dataframe(df_sorted[display_cols], use_container_width=True)
+    # ── Tabla principal ─────────────────────────────────────────────
+    st.markdown(f"### {_t('Ranking de Modelos', 'Model Ranking', 'Ranking de Modelos')}")
 
-        if not df_sorted.empty:
-            winner = df_sorted.iloc[0]
-            st.success(
-                f"🥇 **{_t('Primer lugar', 'First place', 'Primeiro lugar')}:** "
-                f"{winner.get('modelo', '—')}  "
-                f"| Accuracy: {_fmt_metric(winner.get('accuracy'))}"
-                f" | F1: {_fmt_metric(winner.get('f1_score'))}"
-                f" | MCC: {_fmt_metric(winner.get('mcc'))}"
-            )
-    else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    display_map = {
+        "modelo": "Modelo",
+        "accuracy": "Accuracy",
+        "balanced_accuracy": "Balanced Accuracy",
+        "f1_score": "F1-macro",
+        "mcc": "MCC",
+        "precision": "Precisión macro",
+        "recall": "Recall macro",
+    }
+    available = [c for c in display_map if c in df.columns]
+    mostrar = df[available].copy()
+    mostrar.columns = [display_map[c] for c in available]
+    for col in mostrar.columns:
+        if col != "Modelo":
+            mostrar[col] = mostrar[col].apply(_fmt_metric)
+
+    st.dataframe(mostrar, use_container_width=True, hide_index=True)
+
+    # ── Ganador ─────────────────────────────────────────────────────
+    if not df.empty:
+        winner = df.iloc[0]
+        info_box(
+            _t(
+                f"🥇 **Primer lugar:** {winner.get('modelo', '—')}  "
+                f"| MCC: {_fmt_metric(winner.get('mcc'))}"
+                f" | F1-macro: {_fmt_metric(winner.get('f1_score'))}"
+                f" | Accuracy: {_fmt_metric(winner.get('accuracy'))}",
+                f"🥇 **First place:** {winner.get('modelo', '—')}  "
+                f"| MCC: {_fmt_metric(winner.get('mcc'))}"
+                f" | F1-macro: {_fmt_metric(winner.get('f1_score'))}"
+                f" | Accuracy: {_fmt_metric(winner.get('accuracy'))}",
+                f"🥇 **Primeiro lugar:** {winner.get('modelo', '—')}  "
+                f"| MCC: {_fmt_metric(winner.get('mcc'))}"
+                f" | F1-macro: {_fmt_metric(winner.get('f1_score'))}"
+                f" | Accuracy: {_fmt_metric(winner.get('accuracy'))}",
+            ),
+            type_="success",
+        )
+        info_box(
+            _t(
+                "El ranking prioriza MCC, seguido de F1-macro y Accuracy.",
+                "Ranking prioritizes MCC, followed by F1-macro and Accuracy.",
+                "O ranking prioriza MCC, seguido de F1-macro e Acurácia.",
+            ),
+            type_="info",
+        )
 
     st.markdown("---")
 
-    comp_dir = Path("reports/modelos/comparativos")
-    if comp_dir.exists():
-        csv_files = sorted(comp_dir.glob("*.csv"))
-        for csv_f in csv_files:
-            try:
-                df_comp = pd.read_csv(csv_f)
-                if not df_comp.empty:
-                    with st.expander(f"**{csv_f.stem.replace('_', ' ').title()}**"):
-                        st.dataframe(df_comp, use_container_width=True, hide_index=True)
-            except Exception:
-                pass
+    # ── F1 por clase ────────────────────────────────────────────────
+    df_f1 = _load_f1_por_clase()
+    if df_f1 is not None and not df_f1.empty:
+        rename_f1 = {"modelo": "Modelo"}
+        for c in df_f1.columns:
+            if c not in rename_f1 and c != "f1_macro_calculado":
+                rename_f1[c] = c
+        rename_f1["f1_macro_calculado"] = "F1-macro calculado"
+        mostrar_f1 = df_f1.rename(columns=rename_f1).copy()
+        if "F1-macro calculado" in mostrar_f1.columns:
+            mostrar_f1["F1-macro calculado"] = mostrar_f1["F1-macro calculado"].apply(_fmt_metric)
 
-        png_files = sorted(comp_dir.glob("*.png"))
-        if png_files:
-            st.markdown(f"### {_t('Gráficos comparativos', 'Comparison charts', 'Gráficos comparativos')}")
-            cols = st.columns(2)
-            for i, img_path in enumerate(png_files):
-                with cols[i % 2]:
-                    st.image(str(img_path), use_column_width=True, caption=img_path.stem)
+        # Validar consistencia con la tabla principal
+        f1_check = {}
+        inconsistente = False
+        if "F1-macro calculado" in mostrar_f1.columns:
+            for _, r in mostrar_f1.iterrows():
+                f1_check[str(r.get("Modelo", ""))] = r.get("F1-macro calculado")
+        if df is not None and not df.empty:
+            inconsistente = False
+            for _, r in df.iterrows():
+                modelo = str(r.get("modelo", ""))
+                general_f1 = r.get("f1_score")
+                calc_f1 = f1_check.get(modelo)
+                if general_f1 is not None and calc_f1 is not None:
+                    try:
+                        if abs(float(general_f1) - float(calc_f1)) > 0.01:
+                            inconsistente = True
+                            break
+                    except (TypeError, ValueError):
+                        inconsistente = True
+                        break
+
+        if inconsistente:
+            info_box(
+                _t(
+                    "⚠️ Los valores de F1 por clase son inconsistentes con las métricas generales. "
+                    "Regenera la evaluación comparativa.",
+                    "⚠️ F1 per class values are inconsistent with general metrics. "
+                    "Regenerate the comparative evaluation.",
+                    "⚠️ Os valores de F1 por classe são inconsistentes com as métricas gerais. "
+                    "Regenere a avaliação comparativa.",
+                ),
+                type_="error",
+            )
+        else:
+            with st.expander(
+                _t("📊 F1 por clase", "📊 F1 per class", "📊 F1 por classe"),
+                expanded=False,
+            ):
+                st.dataframe(mostrar_f1, use_container_width=True, hide_index=True)
+                info_box(
+                    _t(
+                        "El F1 por clase muestra el equilibrio entre precisión y recall para cada "
+                        "enfermedad. El F1-macro calculado corresponde al promedio simple de las "
+                        "cuatro clases.",
+                        "Per-class F1 shows the balance between precision and recall for each "
+                        "disease. The calculated F1-macro is the simple average of the four classes.",
+                        "O F1 por classe mostra o equilíbrio entre precisão e recall para cada "
+                        "doença. O F1-macro calculado corresponde à média simples das quatro classes.",
+                    ),
+                    type_="info",
+                )
+    else:
+        pass  # No se encontró archivo, no mostrar nada
+
+    # ── Gráficos comparativos ───────────────────────────────────────
+    png_files = sorted(COMP_DIR.glob("*.png"))
+    if png_files:
+        st.markdown(f"### {_t('Gráficos comparativos', 'Comparison charts', 'Gráficos comparativos')}")
+        cols = st.columns(2)
+        for i, img_path in enumerate(png_files):
+            with cols[i % 2]:
+                st.image(str(img_path), use_column_width=True, caption=img_path.stem)
+
+
+def _reload_ranking():
+    ranking_path = REPORTS_DIR / "ranking_modelos.csv"
+    best_path = REPORTS_DIR / "mejor_modelo.txt"
+    try:
+        if ranking_path.exists():
+            df = pd.read_csv(ranking_path)
+            st.session_state.ranking_data = df.to_dict("records")
+        if best_path.exists():
+            with open(best_path, encoding="utf-8") as f:
+                st.session_state.best_model_name = f.read().strip()
+    except Exception:
+        pass

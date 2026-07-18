@@ -293,12 +293,15 @@ def crear_ranking(
     return df
 
 
-def contar_comparaciones_significativas(
+def contar_victorias_significativas(
     modelo_ganador: str,
 ) -> int:
     """
-    Cuenta las comparaciones significativas en las que
-    participó el modelo ganador.
+    Cuenta las comparaciones post-hoc en las que el modelo ganador
+    es significativamente mejor que su oponente.
+    Solo cuenta si:
+    - la comparación es significativa (después de Holm), y
+    - el ganador realmente favorece al modelo (b > c si es n1, c > b si es n2).
     """
     if not POSTHOC_PATH.is_file():
         return 0
@@ -310,6 +313,8 @@ def contar_comparaciones_significativas(
     columnas_requeridas = {
         "n1",
         "n2",
+        "b",
+        "c",
         "significativo",
     }
 
@@ -317,17 +322,6 @@ def contar_comparaciones_significativas(
         df.columns
     ):
         return 0
-
-    comparaciones = df[
-        (
-            df["n1"]
-            == modelo_ganador
-        )
-        | (
-            df["n2"]
-            == modelo_ganador
-        )
-    ].copy()
 
     valores_significativos = {
         "sí",
@@ -337,17 +331,21 @@ def contar_comparaciones_significativas(
         "yes",
     }
 
-    mascara = (
-        comparaciones["significativo"]
-        .astype(str)
-        .str.strip()
-        .str.lower()
-        .isin(valores_significativos)
-    )
+    victorias = 0
+    for _, row in df.iterrows():
+        sig = str(row.get("significativo", "")).strip().lower() in valores_significativos
+        if not sig:
+            continue
+        n1 = str(row.get("n1", ""))
+        n2 = str(row.get("n2", ""))
+        b = row.get("b", 0)
+        c = row.get("c", 0)
+        if n1 == modelo_ganador and b > c:
+            victorias += 1
+        elif n2 == modelo_ganador and c > b:
+            victorias += 1
 
-    return int(
-        mascara.sum()
-    )
+    return victorias
 
 
 def limpiar_modelo_final() -> None:
@@ -372,7 +370,7 @@ def limpiar_modelo_final() -> None:
 def persistir_modelo_ganador(
     modelo_ganador: str,
     ganador: pd.Series,
-    comparaciones_significativas: int,
+    victorias_significativas: int,
 ) -> None:
     """
     Copia los artefactos ya entrenados del modelo ganador
@@ -460,8 +458,8 @@ def persistir_modelo_ganador(
                 ganador["mcc"]
             ),
         },
-        "comparaciones_significativas_holm": int(
-            comparaciones_significativas
+        "victorias_significativas_holm": int(
+            victorias_significativas
         ),
         "requiere_reentrenamiento": False,
         "artefactos": artefactos_guardados,
@@ -575,7 +573,7 @@ def guardar_grafico(
 def guardar_resultados(
     df_ranking: pd.DataFrame,
     ganador: pd.Series,
-    comparaciones_significativas: int,
+    victorias_significativas: int,
 ) -> None:
     """
     Guarda el ranking y la justificación del ganador.
@@ -622,8 +620,8 @@ def guardar_resultados(
         "- F1-macro utilizado como segundo criterio.\n"
         "- Accuracy utilizada como tercer criterio.\n\n"
         "Respaldo estadístico:\n"
-        f"- Comparaciones significativas con corrección de Holm: "
-        f"{comparaciones_significativas}.\n\n"
+        f"- Victorias significativas con corrección Holm: "
+        f"{victorias_significativas}.\n\n"
         "El modelo fue persistido para realizar inferencias "
         "sin volver a entrenarlo.\n"
     )
@@ -651,8 +649,47 @@ def main() -> None:
         ganador["modelo"]
     )
 
-    comparaciones_significativas = (
-        contar_comparaciones_significativas(
+    # ── Comprobaciones de consistencia ──────────────────────────────
+    # Verificar nombres Bootstrap contra ARTEFACTOS_MODELOS
+    nombres_bootstrap = set(df_metricas["modelo"].astype(str).tolist())
+    nombres_artefactos = set(ARTEFACTOS_MODELOS.keys())
+    faltantes_en_artefactos = nombres_bootstrap - nombres_artefactos
+    faltantes_en_bootstrap = nombres_artefactos - nombres_bootstrap
+    if faltantes_en_artefactos:
+        print(
+            "⚠️  Modelos en bootstrap sin artefactos configurados: "
+            f"{sorted(faltantes_en_artefactos)}"
+        )
+    if faltantes_en_bootstrap:
+        print(
+            "⚠️  Modelos con artefactos pero sin métricas bootstrap: "
+            f"{sorted(faltantes_en_bootstrap)}"
+        )
+
+    # Verificar que el ganador tenga artefactos disponibles
+    if modelo_ganador not in ARTEFACTOS_MODELOS:
+        raise ValueError(
+            f"El modelo ganador '{modelo_ganador}' no tiene "
+            "artefactos configurados."
+        )
+
+    # Verificar bootstrap no vacío
+    if df_metricas.empty:
+        raise ValueError(
+            "El archivo de bootstrap está vacío. "
+            "Ejecuta primero la validación estadística."
+        )
+
+    # Advertir si falta post-hoc
+    if not POSTHOC_PATH.is_file():
+        print(
+            "\n⚠️  No se encontró el archivo de post-hoc "
+            "(mcnemar_holm_posthoc.csv). La selección se realizó "
+            "por métricas; no se encontró respaldo post-hoc disponible."
+        )
+
+    victorias_significativas = (
+        contar_victorias_significativas(
             modelo_ganador
         )
     )
@@ -660,7 +697,7 @@ def main() -> None:
     guardar_resultados(
         df_ranking,
         ganador,
-        comparaciones_significativas,
+        victorias_significativas,
     )
 
     guardar_grafico(
@@ -708,8 +745,8 @@ def main() -> None:
     )
 
     print(
-        f"  Comparaciones significativas: "
-        f"{comparaciones_significativas}"
+        f"  Victorias significativas (Holm): "
+        f"{victorias_significativas}"
     )
 
     print(
@@ -720,7 +757,7 @@ def main() -> None:
     persistir_modelo_ganador(
         modelo_ganador,
         ganador,
-        comparaciones_significativas,
+        victorias_significativas,
     )
 
     print(

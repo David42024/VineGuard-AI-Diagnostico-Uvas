@@ -1,10 +1,9 @@
-"""Statistical tests view — McNemar, Cochran Q, Bootstrap, effect size."""
+"""Statistical tests view — Cochran Q, McNemar+Holm, Bootstrap, Effect Size."""
 
 import streamlit as st
 import pandas as pd
 from pathlib import Path
 from ui.components import section_header, empty_state, info_box, run_script_button
-
 
 STAT_DIR = Path("reports/estadistica")
 
@@ -24,11 +23,244 @@ def _read_csv(rel_path: str) -> pd.DataFrame | None:
         return None
 
 
+def _fmt_p(val: float) -> str:
+    if pd.isna(val):
+        return "—"
+    if val < 0.0001:
+        return "< 0.0001"
+    return f"{val:.6f}"
+
+
+def _fmt_p4(val: float) -> str:
+    if pd.isna(val):
+        return "—"
+    if val < 0.0001:
+        return "< 0.0001"
+    return f"{val:.4f}"
+
+
+def _render_cochran():
+    df = _read_csv("cochran_q_resultado.csv")
+    if df is None or df.empty:
+        empty_state(
+            "📊",
+            _t("Cochran Q no disponible", "Cochran Q not available", "Cochran Q indisponível"),
+            _t("Ejecuta las pruebas estadísticas para generar este reporte.",
+               "Run the statistical tests to generate this report.",
+               "Execute os testes estatísticos para gerar este relatório."),
+        )
+        return
+
+    cols = {"estadistico_Q": "Estadístico Q", "p_value": "Valor p",
+            "interpretacion": "Interpretación", "k": "Modelos comparados",
+            "n": "Imágenes evaluadas"}
+    mostrar = df[list(cols.keys())].copy()
+    mostrar.columns = list(cols.values())
+    if "Valor p" in mostrar.columns:
+        mostrar["Valor p"] = mostrar["Valor p"].apply(_fmt_p)
+
+    st.markdown("**Prueba de Cochran Q — Comparación global simultánea**")
+    st.dataframe(mostrar, use_container_width=True, hide_index=True)
+
+    p_val = df["p_value"].iloc[0] if "p_value" in df.columns else 1.0
+    info_box(
+        _t(
+            "Cochran Q determina si existe una diferencia global entre los modelos evaluados "
+            "sobre las mismas imágenes de prueba.",
+            "Cochran Q determines whether there is a global difference among the models evaluated "
+            "on the same test images.",
+            "O Q de Cochran determina se existe uma diferença global entre os modelos avaliados "
+            "nas mesmas imagens de teste.",
+        ),
+        type_="info",
+    )
+    if p_val < 0.05:
+        info_box(
+            _t(
+                "Cochran Q es significativo (p < 0.05). Corresponde revisar el post-hoc "
+                "McNemar + Holm en la siguiente pestaña.",
+                "Cochran Q is significant (p < 0.05). Check the McNemar + Holm post-hoc "
+                "in the next tab.",
+                "Cochran Q é significativo (p < 0.05). Confira o post-hoc McNemar + Holm "
+                "na próxima aba.",
+            ),
+            type_="success",
+        )
+
+
+def _render_holm():
+    df = _read_csv("mcnemar_holm_posthoc.csv")
+    if df is None or df.empty:
+        empty_state(
+            "📊",
+            _t("McNemar + Holm no disponible", "McNemar + Holm not available", "McNemar + Holm indisponível"),
+            _t("Cochran Q debe ser significativo para generar este reporte. "
+               "Ejecuta las pruebas estadísticas primero.",
+               "Cochran Q must be significant to generate this report. "
+               "Run the statistical tests first.",
+               "Cochran Q deve ser significativo para gerar este relatório. "
+               "Execute os testes estatísticos primeiro."),
+        )
+        return
+
+    cols = {"n1": "Modelo 1", "n2": "Modelo 2", "b": "Acierta M1 / falla M2",
+            "c": "Falla M1 / acierta M2", "statistic": "Estadístico",
+            "p_raw": "Valor p original", "p_holm": "Valor p ajustado",
+            "metodo": "Método", "significativo": "¿Diferencia significativa?"}
+    mostrar = df[list(cols.keys())].copy()
+    mostrar.columns = list(cols.values())
+    mostrar["Valor p original"] = mostrar["Valor p original"].apply(_fmt_p)
+    mostrar["Valor p ajustado"] = mostrar["Valor p ajustado"].apply(_fmt_p4)
+
+    favorecido = []
+    for _, row in df.iterrows():
+        if row["b"] > row["c"]:
+            favorecido.append(row["n1"])
+        elif row["c"] > row["b"]:
+            favorecido.append(row["n2"])
+        else:
+            favorecido.append("Empate")
+    mostrar["Modelo favorecido"] = favorecido
+
+    st.markdown("**McNemar post-hoc con corrección Holm — Comparaciones por pares**")
+    st.dataframe(mostrar, use_container_width=True, hide_index=True)
+
+    info_box(
+        _t(
+            "La corrección Holm controla el error producido por realizar múltiples "
+            "comparaciones. Las conclusiones deben basarse en el valor p ajustado.",
+            "Holm correction controls the error from performing multiple comparisons. "
+            "Conclusions should be based on the adjusted p-value.",
+            "A correção de Holm controla o erro produzido ao realizar múltiplas "
+            "comparações. As conclusões devem basear-se no valor p ajustado.",
+        ),
+        type_="info",
+    )
+
+
+def _render_bootstrap():
+    df = _read_csv("intervalos_confianza_bootstrap.csv")
+    if df is None or df.empty:
+        empty_state(
+            "📊",
+            _t("Bootstrap no disponible", "Bootstrap not available", "Bootstrap indisponível"),
+            _t("Ejecuta las pruebas estadísticas para generar este reporte.",
+               "Run the statistical tests to generate this report.",
+               "Execute os testes estatísticos para gerar este relatório."),
+        )
+        return
+
+    cols = {"modelo": "Modelo", "acc_media": "Accuracy media",
+            "acc_ci_inf": "Accuracy IC inferior", "acc_ci_sup": "Accuracy IC superior",
+            "f1_media": "F1-macro medio", "f1_ci_inf": "F1 IC inferior",
+            "f1_ci_sup": "F1 IC superior", "mcc_media": "MCC medio",
+            "mcc_ci_inf": "MCC IC inferior", "mcc_ci_sup": "MCC IC superior"}
+    mostrar = df[list(cols.keys())].copy()
+    mostrar.columns = list(cols.values())
+    mostrar = mostrar.sort_values("MCC medio", ascending=False).reset_index(drop=True)
+
+    for c in mostrar.columns:
+        if c != "Modelo":
+            mostrar[c] = mostrar[c].apply(lambda x: round(x, 4) if pd.notna(x) else x)
+
+    st.markdown("**Intervalos de confianza Bootstrap estratificado (95%)**")
+    st.dataframe(mostrar, use_container_width=True, hide_index=True)
+
+    if not mostrar.empty:
+        best_model = mostrar.iloc[0]["Modelo"]
+        best_mcc = mostrar.iloc[0]["MCC medio"]
+        info_box(
+            _t(
+                f"Modelo con mayor MCC: **{best_model}** ({best_mcc:.4f}). "
+                "Intervalos más altos y estrechos indican mejor rendimiento y mayor estabilidad.",
+                f"Model with highest MCC: **{best_model}** ({best_mcc:.4f}). "
+                "Higher and narrower intervals indicate better performance and greater stability.",
+                f"Modelo com maior MCC: **{best_model}** ({best_mcc:.4f}). "
+                "Intervalos mais altos e estreitos indicam melhor desempenho e maior estabilidade.",
+            ),
+            type_="success",
+        )
+
+    info_box(
+        _t(
+            "El bootstrap estima la estabilidad de Accuracy, F1-macro y MCC mediante 1000 "
+            "remuestreos estratificados. Intervalos más altos y estrechos indican mejor "
+            "rendimiento y mayor estabilidad.",
+            "Bootstrap estimates the stability of Accuracy, F1-macro and MCC using 1000 "
+            "stratified resamples. Higher and narrower intervals indicate better performance "
+            "and greater stability.",
+            "O bootstrap estima a estabilidade de Accuracy, F1-macro e MCC usando 1000 "
+            "reamostragens estratificadas. Intervalos mais altos e estreitos indicam melhor "
+            "desempenho e maior estabilidade.",
+        ),
+        type_="info",
+    )
+
+
+def _render_effect_size():
+    df = _read_csv("tamano_efecto.csv")
+    if df is None or df.empty:
+        empty_state(
+            "📊",
+            _t("Tamaño del efecto no disponible", "Effect size not available", "Tamanho do efeito indisponível"),
+            _t("Ejecuta las pruebas estadísticas para generar este reporte.",
+               "Run the statistical tests to generate this report.",
+               "Execute os testes estatísticos para gerar este relatório."),
+        )
+        return
+
+    cols = {"modelo_1": "Modelo 1", "modelo_2": "Modelo 2",
+            "diff_accuracy_modelo1_menos_modelo2": "Diferencia Accuracy",
+            "abs_diff_accuracy": "Diferencia absoluta Accuracy",
+            "diff_f1_macro_modelo1_menos_modelo2": "Diferencia F1-macro",
+            "diff_mcc_modelo1_menos_modelo2": "Diferencia MCC",
+            "odds_ratio_mcnemar_cc": "Odds ratio"}
+    mostrar = df[list(cols.keys())].copy()
+    mostrar.columns = list(cols.values())
+
+    favorecido = []
+    for _, row in df.iterrows():
+        diff_mcc = row.get("diff_mcc_modelo1_menos_modelo2", 0)
+        if diff_mcc > 0:
+            favorecido.append(row["modelo_1"])
+        elif diff_mcc < 0:
+            favorecido.append(row["modelo_2"])
+        else:
+            favorecido.append("Empate")
+    mostrar["Modelo favorecido"] = favorecido
+
+    mostrar = mostrar.sort_values("Diferencia absoluta Accuracy", ascending=False).reset_index(drop=True)
+
+    for c in mostrar.columns:
+        if c not in ("Modelo 1", "Modelo 2", "Modelo favorecido"):
+            mostrar[c] = mostrar[c].apply(lambda x: round(x, 4) if pd.notna(x) else x)
+
+    st.markdown("**Tamaño del efecto — Magnitud de las diferencias entre modelos**")
+    st.dataframe(mostrar, use_container_width=True, hide_index=True)
+
+    info_box(
+        _t(
+            "El tamaño del efecto indica cuánto difieren los modelos en la práctica. "
+            "Un resultado estadísticamente significativo puede tener una diferencia "
+            "pequeña, por eso debe revisarse junto con esta tabla.",
+            "Effect size indicates how much models differ in practice. "
+            "A statistically significant result may have a small difference, "
+            "so it should be reviewed together with this table.",
+            "O tamanho do efeito indica quanto os modelos diferem na prática. "
+            "Um resultado estatisticamente significativo pode ter uma diferença "
+            "pequena, por isso deve ser revisado junto com esta tabela.",
+        ),
+        type_="info",
+    )
+
+
 def render():
     lang = st.session_state.get("language", "es")
     section_header(
-        _t("Pruebas Estadísticas", "Statistical Tests", "Testes Estatísticos"),
-        _t("Validación estadística del rendimiento de los modelos", "Statistical validation of model performance", "Validação estatística do desempenho dos modelos"),
+        _t("Validación Estadística", "Statistical Validation", "Validação Estatística"),
+        _t("Pruebas estadísticas del rendimiento de los modelos",
+          "Statistical tests of model performance",
+          "Testes estatísticos do desempenho dos modelos"),
         "📈",
     )
 
@@ -37,114 +269,39 @@ def render():
         _t("📈 Ejecutar pruebas estadísticas", "📈 Run statistical tests", "📈 Executar testes estatísticos"),
         key="run_stats",
         confirm_message=_t(
-            "¿Ejecutar todas las pruebas estadísticas (McNemar, Cochran Q, Bootstrap, etc.)?",
-            "Run all statistical tests (McNemar, Cochran Q, Bootstrap, etc.)?",
-            "Executar todos os testes estatísticos (McNemar, Cochran Q, Bootstrap, etc.)?",
+            "¿Ejecutar todas las pruebas estadísticas (Cochran Q, McNemar+Holm, Bootstrap, etc.)?",
+            "Run all statistical tests (Cochran Q, McNemar+Holm, Bootstrap, etc.)?",
+            "Executar todos os testes estatísticos (Cochran Q, McNemar+Holm, Bootstrap, etc.)?",
         ),
     )
 
     if not STAT_DIR.exists():
-        empty_state("📈", _t("Pruebas estadísticas no disponibles", "Statistical tests not available", "Testes estatísticos indisponíveis"),
-                     _t("Ejecuta src/validacion_estadistica_modelos.py para generar los reportes.", "Run src/validacion_estadistica_modelos.py to generate reports.", "Execute src/validacion_estadistica_modelos.py para gerar relatórios."))
+        empty_state(
+            "📈",
+            _t("Pruebas estadísticas no disponibles",
+               "Statistical tests not available",
+               "Testes estatísticos indisponíveis"),
+            _t("Ejecuta src/validacion_estadistica_modelos.py para generar los reportes.",
+               "Run src/validacion_estadistica_modelos.py to generate reports.",
+               "Execute src/validacion_estadistica_modelos.py para gerar relatórios."),
+        )
         return
 
-    tests = []
+    tab_cochran, tab_holm, tab_bootstrap, tab_effect = st.tabs([
+        "1. Cochran Q",
+        "2. McNemar + Holm",
+        "3. Bootstrap",
+        "4. Tamaño del efecto",
+    ])
 
-    df_mc = _read_csv("mcnemar_resultados.csv")
-    if df_mc is not None:
-        tests.append(("McNemar", df_mc, "Prueba de McNemar — comparación por pares entre modelos"))
+    with tab_cochran:
+        _render_cochran()
 
-    df_holm = _read_csv("mcnemar_holm_posthoc.csv")
-    if df_holm is not None:
-        tests.append(("McNemar + Holm", df_holm, "Corrección de Holm para comparaciones múltiples"))
+    with tab_holm:
+        _render_holm()
 
-    df_cq = _read_csv("cochran_q_resultado.csv")
-    if df_cq is not None:
-        tests.append(("Cochran Q", df_cq, "Prueba de Cochran Q — comparación global de modelos"))
+    with tab_bootstrap:
+        _render_bootstrap()
 
-    df_bs = _read_csv("intervalos_confianza_bootstrap.csv")
-    if df_bs is not None:
-        tests.append(("Bootstrap", df_bs, "Intervalos de confianza Bootstrap estratificado"))
-
-    df_ef = _read_csv("tamano_efecto.csv")
-    if df_ef is not None:
-        tests.append(("Tamaño del Efecto", df_ef, "Magnitud de las diferencias entre modelos"))
-
-    if tests:
-        tab_labels = [t[0] for t in tests]
-        tabs = st.tabs(tab_labels)
-        interpretaciones = {
-            "McNemar": _t(
-                "La prueba de McNemar compara si dos modelos tienen diferencias significativas en sus predicciones. "
-                "Un **valor p < 0.05** indica que los modelos se comportan de manera distinta (significativo). "
-                "Si el valor p es alto (≥ 0.05), no hay evidencia suficiente para decir que los modelos difieren.",
-                "McNemar's test compares whether two models have significant differences in their predictions. "
-                "A **p-value < 0.05** indicates the models behave differently (significant). "
-                "If the p-value is high (≥ 0.05), there is insufficient evidence to say the models differ.",
-                "O teste de McNemar compara se dois modelos têm diferenças significativas nas suas previsões. "
-                "Um **valor p < 0.05** indica que os modelos se comportam de forma diferente (significativo). "
-                "Se o valor p for alto (≥ 0.05), não há evidência suficiente para dizer que os modelos diferem.",
-            ),
-            "McNemar + Holm": _t(
-                "La corrección de Holm ajusta los valores p al hacer múltiples comparaciones, "
-                "reduciendo la probabilidad de falsos positivos. Un resultado **significativo** después "
-                "de la corrección Holm indica una diferencia robusta entre los modelos.",
-                "Holm's correction adjusts p-values when making multiple comparisons, "
-                "reducing the probability of false positives. A **significant** result after "
-                "Holm correction indicates a robust difference between models.",
-                "A correção de Holm ajusta os valores p ao fazer múltiplas comparações, "
-                "reduzindo a probabilidade de falsos positivos. Um resultado **significativo** após "
-                "a correção de Holm indica uma diferença robusta entre os modelos.",
-            ),
-            "Cochran Q": _t(
-                "La prueba de Cochran Q evalúa si **todos los modelos tienen el mismo rendimiento** "
-                "de forma simultánea. Si el valor p es < 0.05, se rechaza la hipótesis nula y "
-                "concluimos que al menos un modelo es diferente. En ese caso, el post-hoc de "
-                "McNemar con corrección Holm identifica qué pares específicos tienen diferencias.",
-                "Cochran's Q test evaluates whether **all models have the same performance** "
-                "simultaneously. If the p-value is < 0.05, the null hypothesis is rejected and "
-                "we conclude that at least one model is different. In that case, McNemar's post-hoc "
-                "with Holm correction identifies which specific pairs differ.",
-                "O teste Q de Cochran avalia se **todos os modelos têm o mesmo desempenho** "
-                "simultaneamente. Se o valor p for < 0.05, a hipótese nula é rejeitada e "
-                "concluímos que pelo menos um modelo é diferente. Nesse caso, o post-hoc de "
-                "McNemar com correção de Holm identifica quais pares específicos diferem.",
-            ),
-            "Bootstrap": _t(
-                "Los intervalos de confianza bootstrap al 95% indican el rango donde se encuentra "
-                "la **verdadera métrica** con un 95% de confianza. Si los intervalos de dos modelos "
-                "no se superponen, es una señal de que sus rendimientos son significativamente "
-                "distintos. Intervalos anchos indican mayor incertidumbre en la estimación.",
-                "95% bootstrap confidence intervals indicate the range where the **true metric** "
-                "lies with 95% confidence. If two models' intervals do not overlap, it suggests "
-                "their performances are significantly different. Wide intervals indicate greater "
-                "uncertainty in the estimate.",
-                "Os intervalos de confiança bootstrap de 95% indicam a faixa onde a **verdadeira métrica** "
-                "se encontra com 95% de confiança. Se os intervalos de dois modelos não se sobrepõem, "
-                "é um sinal de que seus desempenhos são significativamente diferentes. Intervalos "
-                "largos indicam maior incerteza na estimativa.",
-            ),
-            "Tamaño del Efecto": _t(
-                "El tamaño del efecto mide la **magnitud de las diferencias** entre modelos, "
-                "independientemente del tamaño de la muestra. Valores grandes indican que la "
-                "diferencia entre modelos no solo es estadísticamente significativa, sino también "
-                "prácticamente relevante.",
-                "Effect size measures the **magnitude of differences** between models, "
-                "regardless of sample size. Large values indicate that the difference between "
-                "models is not only statistically significant but also practically relevant.",
-                "O tamanho do efeito mede a **magnitude das diferenças** entre modelos, "
-                "independentemente do tamanho da amostra. Valores grandes indicam que a diferença "
-                "entre modelos não é apenas estatisticamente significativa, mas também "
-                "praticamente relevante.",
-            ),
-        }
-        for tab, (name, df, desc) in zip(tabs, tests):
-            with tab:
-                st.markdown(f"*{desc}*")
-                st.dataframe(df, use_container_width=True, hide_index=True)
-                interprete = interpretaciones.get(name)
-                if interprete:
-                    st.info(interprete, icon="💡")
-    else:
-        empty_state("📈", _t("Reportes no encontrados", "Reports not found", "Relatórios não encontrados"),
-                     _t("No hay archivos CSV en reports/estadistica/.", "No CSV files in reports/estadistica/.", "Nenhum arquivo CSV em reports/estadistica/."))
+    with tab_effect:
+        _render_effect_size()
