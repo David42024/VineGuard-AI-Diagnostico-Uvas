@@ -168,6 +168,7 @@ def ejecutar_busqueda(
                 "accuracy": "accuracy",
                 "balanced_accuracy": "balanced_accuracy",
                 "f1_weighted": "f1_weighted",
+                "f1_macro": "f1_macro",
             },
             refit=SCORING_PRINCIPAL,
             cv=cv,
@@ -186,6 +187,7 @@ def ejecutar_busqueda(
                 "accuracy": "accuracy",
                 "balanced_accuracy": "balanced_accuracy",
                 "f1_weighted": "f1_weighted",
+                "f1_macro": "f1_macro",
             },
             refit=SCORING_PRINCIPAL,
             cv=cv,
@@ -263,6 +265,14 @@ def ejecutar_busqueda(
             "std_test_f1_weighted"
         ][mejor_indice],
 
+        "f1_macro_mean": resultados_cv[
+            "mean_test_f1_macro"
+        ][mejor_indice],
+
+        "f1_macro_std": resultados_cv[
+            "std_test_f1_macro"
+        ][mejor_indice],
+
         "train_balanced_accuracy_mean": resultados_cv[
             "mean_train_balanced_accuracy"
         ][mejor_indice],
@@ -315,6 +325,8 @@ def guardar_resultados_busqueda(
         "std_test_accuracy",
         "mean_test_f1_weighted",
         "std_test_f1_weighted",
+        "mean_test_f1_macro",
+        "std_test_f1_macro",
         "mean_train_balanced_accuracy",
         "std_train_balanced_accuracy",
         "mean_fit_time",
@@ -851,6 +863,7 @@ def main() -> None:
         "balanced_accuracy_std",
         "accuracy_mean",
         "f1_weighted_mean",
+        "f1_macro_mean",
         "diferencia_train_validacion",
         "n_combinaciones",
         "tiempo_busqueda_total_s",

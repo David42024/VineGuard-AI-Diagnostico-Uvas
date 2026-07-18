@@ -1,0 +1,6 @@
+modelo,Black_rot,Esca,Healthy,Leaf_blight,f1_macro_calculado
+H1 - CNN + SVM,0.9808,0.9838,1.0,1.0,0.9912
+M1 - SVM,0.9485,0.9634,1.0,0.9836,0.9739
+M2 - Random Forest,0.9424,0.9632,0.9942,0.9742,0.9685
+H2 - MobileNetV2 + RF,0.9268,0.9461,0.982,0.9885,0.9609
+M3 - KNN,0.9247,0.9474,0.9941,0.986,0.963

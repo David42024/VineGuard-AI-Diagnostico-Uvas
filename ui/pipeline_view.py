@@ -104,7 +104,7 @@ PIPELINE_STAGES = [
         "label_pt": "Testes estatísticos",
         "script": "src/validacion_estadistica_modelos.py",
         "outputs": ["reports/estadistica/"],
-        "check": lambda: Path("reports/estadistica/mcnemar_resultados.csv").exists(),
+        "check": lambda: Path("reports/estadistica/tamano_efecto.csv").exists(),
     },
     {
         "id": "comparison",

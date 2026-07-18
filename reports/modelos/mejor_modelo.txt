@@ -10,6 +10,6 @@ Criterio de selección:
 - Accuracy utilizada como tercer criterio.
 
 Respaldo estadístico:
-- Comparaciones significativas con corrección de Holm: 4.
+- Victorias significativas con corrección Holm: 4.
 
 El modelo fue persistido para realizar inferencias sin volver a entrenarlo.
