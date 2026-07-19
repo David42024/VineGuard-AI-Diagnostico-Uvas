@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -24,43 +25,76 @@ import {
 import {
   Search,
   Eye,
-  Trash2,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { formatDate, formatConfidence } from "@/lib/utils";
+import { formatDate, formatConfidence } from "@/lib/formatters";
+import { toast } from "sonner";
+import { ErrorState } from "@/components/feedback/error-state";
+import api from "@/lib/api";
 
 interface DiagnosisRow {
   id: number;
   filename: string;
   user: string;
-  date: Date;
+  date: string;
   model: string;
   prediction: string;
   confidence: number;
   status: string;
 }
 
-const mockData: DiagnosisRow[] = Array.from({ length: 25 }, (_, i) => ({
-  id: i + 1,
-  filename: `hoja_${String(i + 1).padStart(3, "0")}.jpg`,
-  user: i % 3 === 0 ? "Admin" : `Cliente ${(i % 5) + 1}`,
-  date: new Date(Date.now() - 86400000 * i),
-  model: ["M1 - SVM", "M2 - Random Forest", "M3 - KNN"][i % 3],
-  prediction: ["Sana", "Podredumbre Negra", "Esca", "Tizón de la Hoja"][i % 4],
-  confidence: 0.85 + Math.random() * 0.14,
-  status: i === 4 ? "processing" : "completed",
-}));
-
 const ITEMS_PER_PAGE = 8;
 
 export default function AdminDiagnosticsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [diagnoses, setDiagnoses] = useState<DiagnosisRow[]>([]);
   const [selectedDiag, setSelectedDiag] = useState<DiagnosisRow | null>(null);
 
-  const filtered = mockData.filter((d) =>
+  const fetchData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.get("/diagnoses?limit=100");
+      const items = (res.data?.items || []).map((d: {
+        id: number;
+        filename?: string;
+        user_name?: string;
+        username?: string;
+        created_at?: string;
+        model_used?: string;
+        result: string;
+        confidence?: number;
+        status: string;
+      }) => ({
+        id: d.id,
+        filename: d.filename || "—",
+        user: d.user_name || d.username || "—",
+        date: d.created_at || "",
+        model: d.model_used || "—",
+        prediction: d.result?.replace(/_/g, " ") || "—",
+        confidence: d.confidence ?? 0,
+        status: d.status || "completed",
+      }));
+      setDiagnoses(items);
+    } catch {
+      setError("Error al cargar diagnósticos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (error && diagnoses.length === 0) return <ErrorState message={error} onRetry={fetchData} />;
+
+  const filtered = diagnoses.filter((d) =>
     d.filename.toLowerCase().includes(search.toLowerCase())
   );
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
@@ -120,7 +154,7 @@ export default function AdminDiagnosticsPage() {
                   <TableCell>
                     <Badge
                       variant={
-                        d.prediction === "Sana" ? "success" : "destructive"
+                        d.prediction === "Healthy" ? "success" : "destructive"
                       }
                     >
                       {d.prediction}
@@ -171,11 +205,14 @@ export default function AdminDiagnosticsPage() {
                           </div>
                         </DialogContent>
                       </Dialog>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        api.post(`/diagnoses/${d.id}/repeat`).then(() => {
+                          toast.success(`Re-analizando diagnóstico #${d.id}`);
+                        }).catch(() => {
+                          toast.error("Error al re-analizar");
+                        });
+                      }}>
                         <RefreshCw className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

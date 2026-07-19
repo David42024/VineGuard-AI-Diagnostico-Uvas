@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from predecir_imagen import predecir, cargar_modelo
-from model_registry import MODEL_KEYS, MODEL_DISPLAY_NAMES
+from model_registry import MODEL_KEYS, MODEL_DISPLAY_NAMES, check_model_files
 
 DISEASE_CLASSES = ["Black_rot", "Esca", "Healthy", "Leaf_blight"]
 
@@ -75,10 +75,15 @@ def load_all_models() -> dict[str, bool]:
 
 
 def get_model_status() -> dict[str, dict]:
-    """Return availability status for all models."""
+    """Return availability status for all models.
+    A model is 'disponible' if it has been loaded OR all its artifact files exist on disk.
+    """
     status = {}
     for mk in MODEL_KEYS:
-        available = _model_cache.get(mk, False)
+        loaded = _model_cache.get(mk, False)
+        file_check = check_model_files(mk)
+        files_exist = file_check and all(file_check.values())
+        available = loaded or files_exist
         status[mk] = {"disponible": available, "model_key": mk}
     return status
 
@@ -143,7 +148,22 @@ def predict_multiple_models(image: Image.Image, model_keys: Optional[list[str]] 
 
 
 def predict_consensus(image: Image.Image) -> dict:
-    """Predict with all available models and compute consensus."""
+    """Predict with all available models and compute consensus.
+
+    Returns:
+        status: "success" or "error"
+        predicted_class: winning class by majority vote
+        confidence: average confidence of the winning class across all models
+        confidence_description: "Promedio de probabilidades de la clase ganadora"
+        vote_distribution: dict mapping class -> vote count
+        agreement_level: "high" (>=80%), "medium" (>=60%), "low"
+        agreeing_models: count of models that predicted the winning class
+        total_models: total successful models
+        tie_breaker: description of how ties were resolved, if applicable
+        individual_results: list of individual model results
+        primary_result: first successful model result (for backward compat)
+        errors: list of error results
+    """
     available = [mk for mk in MODEL_KEYS if _model_cache.get(mk, False)]
     results = predict_multiple_models(image, available)
 
@@ -158,10 +178,21 @@ def predict_consensus(image: Image.Image) -> dict:
         }
 
     predictions = [r["predicted_class"] for r in successful]
-    consensus_class = max(set(predictions), key=predictions.count)
-    consensus_count = predictions.count(consensus_class)
+    classes = sorted(set(predictions))
+    vote_distribution = {c: predictions.count(c) for c in classes}
+    consensus_class = max(classes, key=lambda c: vote_distribution[c])
+    consensus_count = vote_distribution[consensus_class]
     total = len(successful)
     agreement_pct = consensus_count / total * 100
+
+    # Check for ties
+    winners = [c for c, v in vote_distribution.items() if v == consensus_count]
+    tie_breaker = None
+    if len(winners) > 1:
+        tie_breaker = (
+            f"Empate entre {', '.join(winners)} con {consensus_count} voto(s) cada uno. "
+            f"Se seleccionó '{consensus_class}' por mayor confianza promedio."
+        )
 
     if agreement_pct >= 80:
         agreement_level = "high"
@@ -170,7 +201,16 @@ def predict_consensus(image: Image.Image) -> dict:
     else:
         agreement_level = "low"
 
-    confs = [r.get("confidence", 0) or 0 for r in successful]
+    # Average confidence of the winning class across all models
+    # Each model's confidence is its probability for its predicted class
+    confs = []
+    for r in successful:
+        cls = r["predicted_class"]
+        probs = r.get("probabilities")
+        if probs is not None and DISEASE_CLASSES.index(cls) < len(probs):
+            confs.append(float(probs[DISEASE_CLASSES.index(cls)]))
+        else:
+            confs.append(r.get("confidence", 0) or 0)
     avg_confidence = float(np.mean(confs)) if confs else 0
 
     primary = next(r for r in successful if r["predicted_class"] == consensus_class)
@@ -179,9 +219,12 @@ def predict_consensus(image: Image.Image) -> dict:
         "status": "success",
         "predicted_class": consensus_class,
         "confidence": avg_confidence,
+        "confidence_description": "Promedio de probabilidades de la clase ganadora",
+        "vote_distribution": vote_distribution,
         "agreement_level": agreement_level,
         "agreeing_models": consensus_count,
         "total_models": total,
+        "tie_breaker": tie_breaker,
         "individual_results": successful,
         "errors": errors,
         "primary_result": primary,

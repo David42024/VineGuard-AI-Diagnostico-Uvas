@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UploadZone } from "@/components/diagnosis/upload-zone";
 import { ResultCard } from "@/components/diagnosis/result-card";
 import { ConsensusView } from "@/components/diagnosis/consensus-view";
@@ -23,7 +23,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import api from "@/lib/api";
-import type { Diagnosis } from "@/lib/api";
+import type { DiagnosisResponse, ModelRanking } from "@/types/api";
 
 type ModelKey = "consensus" | "best_model" | "compare_all";
 
@@ -61,8 +61,15 @@ export default function DiagnosisPage() {
   const [modelKey, setModelKey] = useState<ModelKey>("consensus");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<Diagnosis | null>(null);
+  const [result, setResult] = useState<DiagnosisResponse | null>(null);
   const [error, setError] = useState("");
+  const [modelRanking, setModelRanking] = useState<ModelRanking[]>([]);
+
+  useEffect(() => {
+    api.get<ModelRanking[]>("/models/ranking")
+      .then((res) => setModelRanking(res.data))
+      .catch(() => {});
+  }, []);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -92,7 +99,9 @@ export default function DiagnosisPage() {
     try {
       let key: string;
       if (modelKey === "best_model") {
-        key = "H1";
+        key = "best_model";
+      } else if (modelKey === "compare_all") {
+        key = "all";
       } else {
         key = "consensus";
       }
@@ -101,7 +110,7 @@ export default function DiagnosisPage() {
       formData.append("file", file);
       formData.append("model_key", key);
 
-      const response = await api.post<Diagnosis>("/diagnoses", formData, {
+      const response = await api.post<DiagnosisResponse>("/diagnoses", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setResult(response.data);
@@ -270,11 +279,15 @@ const handleDownload = async () => {
           {result && (
             <>
               <ResultCard diagnosis={result} />
-              {modelKey === "consensus" && result.consensus && (
+              {(modelKey === "consensus" || modelKey === "compare_all") && result.consensus && (
                 <ConsensusView consensus={result.consensus} />
               )}
               {modelKey === "compare_all" && result.predictions && result.predictions.length > 0 && (
-                <ComparisonView predictions={result.predictions} />
+                <ComparisonView
+                  predictions={result.predictions}
+                  consensusClass={result.consensus?.predicted_class}
+                  ranking={modelRanking}
+                />
               )}
 
               <Card>

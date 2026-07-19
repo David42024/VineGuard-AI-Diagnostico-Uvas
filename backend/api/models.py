@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.mantenedor import MODELOS_DIR
+from src.mantenedor import MODELOS_DIR, MODELS_DIR
 from src.model_registry import MODEL_KEYS, MODEL_DISPLAY_NAMES, MODEL_TYPES, MODEL_REPORT_DIRS
 from src.services.prediction_service import (
     get_model_status,
@@ -185,6 +185,34 @@ def get_ranking(current_user: TokenData = Depends(get_current_user)):
 
 @router.get("/best", response_model=BestModelResponse)
 def get_best(current_user: TokenData = Depends(get_current_user)):
+    # Try rich JSON first
+    MODELO_FINAL_JSON = MODELS_DIR / "modelo_final" / "modelo_final.json"
+    if MODELO_FINAL_JSON.exists():
+        try:
+            import json
+            with open(MODELO_FINAL_JSON, encoding="utf-8") as f:
+                data = json.load(f)
+            return BestModelResponse(
+                model_name=data.get("modelo_ganador", "Unknown"),
+                accuracy=data.get("metricas_test", {}).get("accuracy", 0.0),
+                f1_score=data.get("metricas_test", {}).get("f1_macro", 0.0),
+                mcc=data.get("metricas_test", {}).get("mcc", 0.0),
+                selection_criteria="; ".join(data.get("criterio_seleccion", [])),
+                modelo_ganador=data.get("modelo_ganador"),
+                fecha_seleccion=data.get("fecha_seleccion"),
+                criterio_seleccion=data.get("criterio_seleccion"),
+                metricas_test=data.get("metricas_test"),
+                victorias_significativas_holm=data.get("victorias_significativas_holm"),
+                requiere_reentrenamiento=data.get("requiere_reentrenamiento"),
+                artefactos=[
+                    {"tipo": a["tipo"], "nombre_archivo": a["nombre_archivo"]}
+                    for a in data.get("artefactos", [])
+                ],
+            )
+        except Exception:
+            pass
+
+    # Fallback to legacy mejor_modelo.txt
     best_file = MODELOS_DIR / "mejor_modelo.txt"
     if not best_file.exists():
         raise HTTPException(status_code=404, detail="Archivo de mejor modelo no encontrado")

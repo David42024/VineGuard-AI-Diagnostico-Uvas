@@ -1,8 +1,10 @@
 import csv
+import json
 from pathlib import Path
 from typing import Optional
 
-from src.mantenedor import MODELOS_DIR, ESTADISTICA_DIR, CROSS_VALIDATION_DIR
+from src.mantenedor import MODELOS_DIR, ESTADISTICA_DIR, CROSS_VALIDATION_DIR, COMPARATIVOS_DIR
+from src.mantenedor import MODELS_DIR as MODELS_BASE_DIR
 
 
 class ReportRepository:
@@ -28,8 +30,16 @@ class ReportRepository:
     def get_ranking(self) -> Optional[list[dict]]:
         return self._read_csv(MODELOS_DIR / "ranking_modelos.csv")
 
-    def get_best_model(self) -> Optional[str]:
-        return self._read_txt(MODELOS_DIR / "mejor_modelo.txt")
+    def get_best_model(self) -> Optional[dict]:
+        """Read modelo_final.json — the single source of truth for best model."""
+        path = MODELS_BASE_DIR / "modelo_final" / "modelo_final.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
 
     def get_cross_validation(self) -> Optional[list[dict]]:
         return self._read_csv(CROSS_VALIDATION_DIR / "cross_validation_resultados.csv")
@@ -39,6 +49,9 @@ class ReportRepository:
 
     def get_model_comparison_ranking(self) -> Optional[list[dict]]:
         return self._read_csv(MODELOS_DIR / "ranking_modelos.csv")
+
+    def get_model_comparison(self) -> Optional[list[dict]]:
+        return self._read_csv(COMPARATIVOS_DIR / "comparacion_general_modelos.csv")
 
     def get_effect_size(self) -> Optional[list[dict]]:
         return self._read_csv(ESTADISTICA_DIR / "tamano_efecto.csv")

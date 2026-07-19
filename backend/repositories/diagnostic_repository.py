@@ -283,7 +283,7 @@ class DiagnosticRepository:
             "last_diagnosis": {"result": last.result, "confidence": last.confidence, "timestamp": last.timestamp.isoformat() if last.timestamp else None} if last else None,
         }
 
-    def get_admin_stats(self, exclude_demo: bool = True) -> dict:
+    def get_admin_stats(self, exclude_demo: bool = False) -> dict:
         total = self.count(exclude_demo=exclude_demo)
         today = self.count_today()
         healthy = self.count_healthy(exclude_demo=exclude_demo)

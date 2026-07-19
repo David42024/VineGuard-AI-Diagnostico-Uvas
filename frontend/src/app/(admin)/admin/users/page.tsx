@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -15,13 +16,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Search,
   UserPlus,
   Shield,
   User as UserIcon,
   CheckCircle2,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
+import { ErrorState } from "@/components/feedback/error-state";
+import { toast } from "sonner";
+import api from "@/lib/api";
 
 interface UserRow {
   id: number;
@@ -29,56 +43,73 @@ interface UserRow {
   username: string;
   role: "admin" | "client";
   active: boolean;
-  diagnosticsCount: number;
 }
-
-const mockUsers: UserRow[] = [
-  {
-    id: 1,
-    name: "Admin Principal",
-    username: "admin",
-    role: "admin",
-    active: true,
-    diagnosticsCount: 145,
-  },
-  {
-    id: 2,
-    name: "Cliente Ejemplo",
-    username: "cliente1",
-    role: "client",
-    active: true,
-    diagnosticsCount: 32,
-  },
-  {
-    id: 3,
-    name: "María García",
-    username: "mgarcia",
-    role: "client",
-    active: true,
-    diagnosticsCount: 18,
-  },
-  {
-    id: 4,
-    name: "Juan Pérez",
-    username: "jperez",
-    role: "client",
-    active: false,
-    diagnosticsCount: 7,
-  },
-  {
-    id: 5,
-    name: "Ana López",
-    username: "alopez",
-    role: "client",
-    active: true,
-    diagnosticsCount: 24,
-  },
-];
 
 export default function UsersPage() {
   const [search, setSearch] = useState("");
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const filtered = mockUsers.filter(
+  const fetchData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.get("/users");
+      setUsers((res.data || []).map((u: { id: number; name: string; username: string; role: string; active: boolean }) => ({
+        id: u.id,
+        name: u.name,
+        username: u.username,
+        role: u.role as "admin" | "client",
+        active: u.active,
+      })));
+    } catch {
+      setError("Error al cargar usuarios");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const [showNewUser, setShowNewUser] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserUsername, setNewUserUsername] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+
+  const handleCreateUser = async () => {
+    try {
+      await api.post("/users", {
+        name: newUserName,
+        username: newUserUsername,
+        password: newUserPassword,
+      });
+      toast.success("Usuario creado exitosamente");
+      setShowNewUser(false);
+      setNewUserName("");
+      setNewUserUsername("");
+      setNewUserPassword("");
+      fetchData();
+    } catch {
+      toast.error("Error al crear usuario");
+    }
+  };
+
+  const handleToggleActive = async (user: UserRow) => {
+    try {
+      await api.patch(`/users/${user.id}`, { active: !user.active });
+      toast.success(user.active ? "Usuario desactivado" : "Usuario activado");
+      fetchData();
+    } catch {
+      toast.error("Error al actualizar usuario");
+    }
+  };
+
+  if (error && users.length === 0) return <ErrorState message={error} onRetry={fetchData} />;
+
+  const filtered = users.filter(
     (u) =>
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.username.toLowerCase().includes(search.toLowerCase())
@@ -95,9 +126,42 @@ export default function UsersPage() {
             Administra los usuarios registrados en la plataforma
           </p>
         </div>
-        <Button>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Nuevo Usuario
+        <Dialog open={showNewUser} onOpenChange={setShowNewUser}>
+          <DialogTrigger asChild>
+            <Button>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Nuevo Usuario
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nuevo Usuario</DialogTitle>
+              <DialogDescription>
+                Crea un nuevo usuario en el sistema
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nombre</label>
+                <Input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder="Nombre completo" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Usuario</label>
+                <Input value={newUserUsername} onChange={(e) => setNewUserUsername(e.target.value)} placeholder="nombre.usuario" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Contraseña</label>
+                <Input type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} placeholder="••••••••" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNewUser(false)}>Cancelar</Button>
+              <Button onClick={handleCreateUser} disabled={!newUserName || !newUserUsername || !newUserPassword}>Crear</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
@@ -125,7 +189,6 @@ export default function UsersPage() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Diagnósticos</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -172,16 +235,16 @@ export default function UsersPage() {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell>{user.diagnosticsCount}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => { /* Edit is left as a future enhancement */ }}>
                         Editar
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-destructive"
+                        onClick={() => handleToggleActive(user)}
                       >
                         {user.active ? "Desactivar" : "Activar"}
                       </Button>

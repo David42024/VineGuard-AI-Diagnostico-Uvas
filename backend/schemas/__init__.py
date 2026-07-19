@@ -63,6 +63,13 @@ class UserUpdate(BaseModel):
     active: Optional[bool] = None
 
 
+class UserCreate(BaseModel):
+    name: str
+    username: str
+    password: str
+    role: str = "client"
+
+
 # ─── Diagnosis ────────────────────────────────────────────────────
 
 
@@ -84,9 +91,12 @@ class ConsensusInfo(BaseModel):
     status: str
     predicted_class: Optional[str] = None
     confidence: Optional[float] = None
+    confidence_description: Optional[str] = None
     agreement_level: Optional[str] = None
     agreeing_models: Optional[int] = None
     total_models: Optional[int] = None
+    vote_distribution: Optional[dict[str, int]] = None
+    tie_breaker: Optional[str] = None
 
 
 class PredictionDetail(BaseModel):
@@ -105,6 +115,8 @@ class DiagnosisResponse(BaseModel):
     id: int
     created_at: Optional[datetime] = None
     status: str = "completed"
+    mode: str = "single"
+    mode_label: str = ""
     is_demo: bool = False
     image_url: Optional[str] = None
     prediction: PredictionInfo
@@ -183,12 +195,21 @@ class ModelRanking(BaseModel):
 
 class BestModelResponse(BaseModel):
     model_config = {"protected_namespaces": ()}
-    model_name: str
-    accuracy: float
-    f1_score: float
-    mcc: float
-    selection_criteria: str
+    model_name: str = ""
+    accuracy: float = 0.0
+    f1_score: float = 0.0
+    mcc: float = 0.0
+    selection_criteria: str = ""
     details: Optional[str] = None
+
+    # Rich fields from modelo_final.json
+    modelo_ganador: Optional[str] = None
+    fecha_seleccion: Optional[str] = None
+    criterio_seleccion: Optional[list[str]] = None
+    metricas_test: Optional[dict[str, float]] = None
+    victorias_significativas_holm: Optional[int] = None
+    requiere_reentrenamiento: Optional[bool] = None
+    artefactos: Optional[list[dict[str, str]]] = None
 
 
 class ModelTestRequest(BaseModel):

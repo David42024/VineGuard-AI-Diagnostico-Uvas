@@ -17,120 +17,91 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Activity, Brain, Trophy } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { RefreshCw, Activity, Trophy, Users } from "lucide-react";
+import { formatDate, formatConfidence } from "@/lib/formatters";
 import api from "@/lib/api";
+import type { ModelRanking, BestModelResponse } from "@/types/api";
 import { ErrorState } from "@/components/feedback/error-state";
+import { formatClassName, MODEL_NAMES, MODE_LABELS } from "@/lib/constants";
 
-interface Diagnostic {
+interface RecentDiagnostic {
   id: number;
   created_at: string;
   filename: string;
   result: string;
   confidence: number;
   model_used: string;
+  analysis_type: string;
   status: string;
   user_name?: string;
   username?: string;
 }
 
-interface UserInfo {
+interface SystemUser {
   id: number;
   username: string;
   name: string;
   role: string;
   active: boolean;
+  created_at?: string;
 }
 
-interface StatsData {
-  totalDiagnostics: number;
-  todayDiagnostics: number;
-  healthyPercentage: number;
-  diseasedPercentage: number;
-  totalUsers: number;
-  diseaseDistribution: { name: string; value: number; color: string }[];
-  diagnosesByDate: { date: string; count: number }[];
-  modelRanking: { name: string; accuracy: number; f1: number; recall: number; mcc: number }[];
-  crossValidation: { modelo: string; accuracy_mean: number; accuracy_std: number }[];
+interface SummaryData {
+  general_stats: {
+    total_diagnostics: number;
+    today_diagnostics: number;
+    healthy_pct: number;
+    diseased_pct: number;
+    total_users: number;
+  };
+  disease_distribution: Record<string, number>;
+  diagnostics_by_date: { date: string; count: number }[];
+  ranking: ModelRanking[];
+  cross_validation: Record<string, string>[];
+  best_model: BestModelResponse | null;
 }
 
-const diseaseColors: Record<string, string> = {
+const DISEASE_COLORS: Record<string, string> = {
   Healthy: "#22C55E",
   Black_rot: "#DC2626",
   Esca: "#F59E0B",
   Leaf_blight: "#3B82F6",
 };
 
+function getModeLabel(modelUsed: string, analysisType?: string): { mode: string; model: string } {
+  const at = analysisType || "";
+  if (at === "consensus" || modelUsed === "consensus")
+    return { mode: "Consenso", model: "5 modelos" };
+  if (at === "best_model" || modelUsed === "best_model" || modelUsed === "H1")
+    return { mode: "Mejor modelo", model: MODEL_NAMES[modelUsed] || modelUsed };
+  if (at === "all" || modelUsed === "all")
+    return { mode: "Comparación", model: "Todos los modelos" };
+  return { mode: MODEL_NAMES[modelUsed] || modelUsed, model: modelUsed };
+}
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [users, setUsers] = useState<UserInfo[]>([]);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [bestModel, setBestModel] = useState<BestModelResponse | null>(null);
+  const [diagnostics, setDiagnostics] = useState<RecentDiagnostic[]>([]);
+  const [users, setUsers] = useState<SystemUser[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
     setError("");
     try {
-      const [statsRes, diagRes, usersRes] = await Promise.all([
-        api.get("/statistics/summary").catch(() => ({ data: { general_stats: {}, disease_distribution: {}, diagnostics_by_date: [], ranking: [], cross_validation: [] } })),
+      const [summaryRes, diagRes, usersRes] = await Promise.all([
+        api.get("/statistics/summary").catch(() => ({ data: null })),
         api.get("/diagnoses?limit=10").catch(() => ({ data: { items: [] } })),
         api.get("/users").catch(() => ({ data: [] })),
       ]);
 
+      const s = summaryRes.data;
+      setSummary(s);
+      setBestModel(s?.best_model || null);
       setDiagnostics(diagRes.data?.items || []);
       setUsers(usersRes.data || []);
-
-      const s = statsRes.data;
-      const g = s.general_stats || {};
-      const dist = s.disease_distribution || {};
-
-      const diseaseDistribution = Object.entries(dist).map(([name, value]) => ({
-        name: name.replace(/_/g, " "),
-        value: value as number,
-        color: diseaseColors[name] || "#6B7280",
-      }));
-
-      const diagnosesByDate = (s.diagnostics_by_date || []).map(
-        (d: { date: string; count: number }) => ({
-          date: new Date(d.date).toLocaleDateString("es", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-          }),
-          count: d.count,
-        })
-      );
-
-      const modelRanking = (s.ranking || []).map(
-        (m: { modelo: string; accuracy: number; f1_score: number; recall: number; mcc?: number }) => ({
-          name: m.modelo,
-          accuracy: m.accuracy || 0,
-          f1: m.f1_score || 0,
-          recall: m.recall || 0,
-          mcc: m.mcc || 0,
-        })
-      );
-
-      const crossValidation = (s.cross_validation || []).map(
-        (cv: { modelo: string; accuracy_mean: number; accuracy_std: number }) => ({
-          modelo: cv.modelo,
-          accuracy_mean: cv.accuracy_mean || 0,
-          accuracy_std: cv.accuracy_std || 0,
-        })
-      );
-
-      setStats({
-        totalDiagnostics: g.total_diagnostics ?? 0,
-        todayDiagnostics: g.today_diagnostics ?? 0,
-        healthyPercentage: Math.round(g.healthy_pct ?? 0),
-        diseasedPercentage: Math.round(g.diseased_pct ?? 0),
-        totalUsers: g.total_users ?? 0,
-        diseaseDistribution,
-        diagnosesByDate,
-        modelRanking,
-        crossValidation,
-      });
     } catch {
       setError("Error al cargar datos del dashboard");
     } finally {
@@ -138,16 +109,29 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   if (error) return <ErrorState message={error} onRetry={fetchData} />;
-  const isEmpty = stats && stats.totalDiagnostics === 0;
+
+  const stats = summary?.general_stats;
+  const isEmpty = stats && stats.total_diagnostics === 0;
+  const diseaseDist = summary?.disease_distribution
+    ? Object.entries(summary.disease_distribution).map(([name, value]) => ({
+        name: formatClassName(name),
+        value,
+        color: DISEASE_COLORS[name] || "#6B7280",
+      }))
+    : [];
+
+  const totalDiagnostics = stats?.total_diagnostics ?? 0;
+  const distTotal = diseaseDist.reduce((s, d) => s + d.value, 0);
+  const healthyCount = diseaseDist.find((d) => d.name === "Healthy")?.value ?? 0;
+  const diseasedCount = distTotal - healthyCount;
+  const healthyPct = totalDiagnostics > 0 ? (healthyCount / totalDiagnostics) * 100 : 0;
+  const diseasedPct = totalDiagnostics > 0 ? (diseasedCount / totalDiagnostics) * 100 : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Panel de Administración</h2>
@@ -159,63 +143,86 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
-      {/* Métricas principales: 4 columnas responsive */}
-      <StatsGrid data={stats ?? undefined} loading={loading} />
+      <StatsGrid
+        data={
+          stats
+            ? {
+                totalDiagnostics,
+                todayDiagnostics: stats.today_diagnostics,
+                healthyPercentage: Math.round(healthyPct),
+                diseasedPercentage: Math.round(diseasedPct),
+                totalUsers: stats.total_users,
+              }
+            : undefined
+        }
+        loading={loading}
+      />
 
-      {/* Tarjeta independiente: Mejor Modelo */}
+      {/* Best Model — from models/modelo_final.json */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             <CardTitle className="text-lg">Mejor Modelo</CardTitle>
           </div>
-          <CardDescription>
-            Seleccionado por mayor MCC ponderado con Accuracy y F1-macro
-          </CardDescription>
+          {bestModel?.criterio_seleccion ? (
+            <CardDescription>{bestModel.criterio_seleccion.join("; ")}</CardDescription>
+          ) : (
+            <CardDescription>Seleccionado por mayor MCC; en caso de empate, se prioriza F1-macro y luego Accuracy</CardDescription>
+          )}
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loading && !bestModel ? (
             <Skeleton className="h-16 w-full" />
-          ) : stats?.modelRanking.length ? (
+          ) : bestModel && bestModel.modelo_ganador ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-8">
               <div>
-                <p className="text-base font-bold">{stats.modelRanking[0].name}</p>
+                <p className="text-base font-bold">{bestModel.modelo_ganador}</p>
                 <Badge variant="outline" className="mt-1 text-xs">Posición #1 en ranking</Badge>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Accuracy</p>
                   <p className="text-xl font-bold text-green-600">
-                    {(stats.modelRanking[0].accuracy * 100).toFixed(2)}%
+                    {bestModel.metricas_test?.accuracy != null
+                      ? `${(bestModel.metricas_test.accuracy * 100).toFixed(2)}%`
+                      : "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">F1-macro</p>
                   <p className="text-xl font-bold text-primary">
-                    {(stats.modelRanking[0].f1 * 100).toFixed(2)}%
+                    {bestModel.metricas_test?.f1_macro != null
+                      ? `${(bestModel.metricas_test.f1_macro * 100).toFixed(2)}%`
+                      : "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">MCC</p>
                   <p className="text-xl font-bold text-blue-600">
-                    {stats.modelRanking[0].mcc
-                      ? (stats.modelRanking[0].mcc * 100).toFixed(2) + "%"
+                    {bestModel.metricas_test?.mcc != null
+                      ? `${(bestModel.metricas_test.mcc * 100).toFixed(2)}%`
                       : "N/A"}
                   </p>
                 </div>
               </div>
-              <details className="text-xs text-muted-foreground sm:ml-auto">
-                <summary className="cursor-pointer select-none font-medium text-primary hover:underline">
-                  Ver criterio de selección
-                </summary>
-                <p className="mt-2 max-w-xs leading-relaxed">
-                  Se selecciona el modelo con el MCC más alto, ponderado junto con Accuracy y
-                  F1-macro, garantizando robustez ante clases desbalanceadas.
+              {bestModel.victorias_significativas_holm != null && (
+                <p className="text-sm text-muted-foreground">
+                  {bestModel.victorias_significativas_holm} victorias significativas con corrección Holm
                 </p>
-              </details>
+              )}
+              {bestModel.requiere_reentrenamiento != null && (
+                <p className={`text-xs font-medium ${bestModel.requiere_reentrenamiento ? "text-amber-600" : "text-green-600"}`}>
+                  {bestModel.requiere_reentrenamiento
+                    ? "⚠ Requiere reentrenamiento"
+                    : "✅ Modelo persistido y listo para inferencia"}
+                </p>
+              )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Sin datos de ranking disponibles</p>
+            <p className="text-sm text-muted-foreground">
+              Sin datos de ranking disponibles. Ejecuta src/seleccion_mejor_modelo.py.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -231,22 +238,31 @@ export default function AdminDashboard() {
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Disease Distribution */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Distribución de Enfermedades</CardTitle>
-                <CardDescription>Proporción por clase diagnósticada</CardDescription>
+                <CardDescription>Proporción por clase diagnosticada</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <Skeleton className="h-64 w-full" />
-                ) : stats?.diseaseDistribution.length ? (
-                  <DonutChart data={stats.diseaseDistribution} />
+                ) : diseaseDist.length ? (
+                  <>
+                    <DonutChart data={diseaseDist} />
+                    {distTotal !== totalDiagnostics && (
+                      <p className="text-xs text-amber-600 mt-2 text-center">
+                        Advertencia: suma de clases ({distTotal}) no coincide con total ({totalDiagnostics})
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p className="text-muted-foreground text-center py-12">Sin datos</p>
                 )}
               </CardContent>
             </Card>
 
+            {/* Diagnoses by Day */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Diagnósticos por Día</CardTitle>
@@ -255,9 +271,14 @@ export default function AdminDashboard() {
               <CardContent>
                 {loading ? (
                   <Skeleton className="h-64 w-full" />
-                ) : stats?.diagnosesByDate.length ? (
+                ) : summary?.diagnostics_by_date?.length ? (
                   <LineChart
-                    data={stats.diagnosesByDate}
+                    data={summary.diagnostics_by_date.map((d) => ({
+                      date: new Date(d.date).toLocaleDateString("es", {
+                        weekday: "short", day: "numeric", month: "short",
+                      }),
+                      count: d.count,
+                    }))}
                     xKey="date"
                     lines={[{ key: "count", color: "#22C55E", name: "Diagnósticos" }]}
                   />
@@ -267,25 +288,28 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
 
+            {/* Ranking */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Ranking de Modelos</CardTitle>
-                <CardDescription>Precisión y F1-Score</CardDescription>
+                <CardDescription>MCC, F1-macro y Accuracy sobre TEST</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <Skeleton className="h-64 w-full" />
-                ) : stats?.modelRanking.length ? (
+                ) : summary?.ranking?.length ? (
                   <BarChart
-                    data={stats.modelRanking.map((m) => ({
-                      name: m.name.replace(/\(.*?\)/, "").trim(),
+                    data={summary.ranking.map((m) => ({
+                      name: m.modelo.replace(/\(.*?\)/, "").trim(),
+                      mcc: +(m.mcc * 100).toFixed(1),
+                      f1: +((m.f1_macro ?? m.f1_score ?? 0) * 100).toFixed(1),
                       accuracy: +(m.accuracy * 100).toFixed(1),
-                      f1: +(m.f1 * 100).toFixed(1),
                     }))}
                     xKey="name"
                     bars={[
-                      { key: "accuracy", color: "#22C55E", name: "Precisión (%)" },
+                      { key: "mcc", color: "#2563EB", name: "MCC (%)" },
                       { key: "f1", color: "#166534", name: "F1 (%)" },
+                      { key: "accuracy", color: "#22C55E", name: "Accuracy (%)" },
                     ]}
                   />
                 ) : (
@@ -296,27 +320,44 @@ export default function AdminDashboard() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {stats?.crossValidation && stats.crossValidation.length > 0 && (
+            {/* Cross Validation */}
+            {summary?.cross_validation && summary.cross_validation.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Validación Cruzada</CardTitle>
-                  <CardDescription>Precisión media por modelo</CardDescription>
+                  <CardDescription>Métricas sobre los modelos entrenados con validación cruzada (5 folds)</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Modelo</TableHead>
-                        <TableHead>Precisión Media</TableHead>
-                        <TableHead>Desviación Estándar</TableHead>
+                        <TableHead>Accuracy media</TableHead>
+                        <TableHead>F1-macro media</TableHead>
+                        <TableHead>MCC media</TableHead>
+                        <TableHead>N° folds</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stats.crossValidation.map((cv) => (
-                        <TableRow key={cv.modelo}>
-                          <TableCell className="font-medium">{cv.modelo}</TableCell>
-                          <TableCell>{(cv.accuracy_mean * 100).toFixed(2)}%</TableCell>
-                          <TableCell>{(cv.accuracy_std * 100).toFixed(2)}%</TableCell>
+                      {summary.cross_validation.map((cv: Record<string, string>, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">{cv.modelo || `Modelo ${i + 1}`}</TableCell>
+                          <TableCell>
+                            {cv.accuracy_mean != null
+                              ? `${(parseFloat(cv.accuracy_mean) * 100).toFixed(2)}%`
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {cv.f1_macro_mean != null
+                              ? `${(parseFloat(cv.f1_macro_mean) * 100).toFixed(2)}%`
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {cv.mcc_mean != null
+                              ? `${(parseFloat(cv.mcc_mean) * 100).toFixed(2)}%`
+                              : "—"}
+                          </TableCell>
+                          <TableCell>{cv.n_folds || "—"}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -325,6 +366,7 @@ export default function AdminDashboard() {
               </Card>
             )}
 
+            {/* Users */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Usuarios del Sistema</CardTitle>
@@ -358,7 +400,10 @@ export default function AdminDashboard() {
                       <div className="space-y-1.5">
                         {users.slice(0, 4).map((u) => (
                           <div key={u.id} className="flex items-center justify-between text-sm">
-                            <span>{u.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3 w-3 text-muted-foreground" />
+                              <span>{u.name}</span>
+                            </div>
                             <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-[10px]">
                               {u.role === "admin" ? "Admin" : "Cliente"}
                             </Badge>
@@ -372,6 +417,7 @@ export default function AdminDashboard() {
             </Card>
           </div>
 
+          {/* Recent Diagnostics */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Diagnósticos Recientes</CardTitle>
@@ -384,6 +430,7 @@ export default function AdminDashboard() {
                     <TableHead>Usuario</TableHead>
                     <TableHead>Archivo</TableHead>
                     <TableHead>Fecha</TableHead>
+                    <TableHead>Modo</TableHead>
                     <TableHead>Modelo</TableHead>
                     <TableHead>Predicción</TableHead>
                     <TableHead>Confianza</TableHead>
@@ -392,35 +439,42 @@ export default function AdminDashboard() {
                 <TableBody>
                   {diagnostics.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No hay diagnósticos recientes
                       </TableCell>
                     </TableRow>
                   ) : (
-                    diagnostics.map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell className="font-medium text-sm">
-                          {d.user_name || d.username || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm max-w-[150px] truncate">{d.filename}</TableCell>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          {d.created_at ? formatDate(new Date(d.created_at)) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px]">
-                            {d.model_used?.replace(/\(.*?\)/, "").trim() || "—"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={d.result === "Healthy" ? "success" : "destructive"} className="text-[10px]">
-                            {d.result.replace(/_/g, " ")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {d.confidence != null ? `${(d.confidence * 100).toFixed(1)}%` : "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    diagnostics.map((d) => {
+                      const modeInfo = getModeLabel(d.model_used, d.analysis_type);
+                      return (
+                        <TableRow key={d.id}>
+                          <TableCell className="font-medium text-sm">
+                            {d.user_name || d.username || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[120px] truncate" title={d.filename}>
+                            {d.filename}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {d.created_at ? formatDate(new Date(d.created_at)) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px]">{modeInfo.mode}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{modeInfo.model}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={d.result === "Healthy" ? "success" : "destructive"}
+                              className="text-[10px]"
+                            >
+                              {formatClassName(d.result)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {d.confidence != null ? formatConfidence(d.confidence) : "—"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

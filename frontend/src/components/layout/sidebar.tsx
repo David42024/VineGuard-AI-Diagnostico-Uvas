@@ -8,7 +8,6 @@ import {
   Search,
   History,
   Brain,
-  GitBranch,
   BarChart3,
   FileText,
   Users,
@@ -49,7 +48,7 @@ const navItems: NavItem[] = [
   // Admin section
   { label: "nav.adminDashboard", href: "/admin", icon: Gauge, adminOnly: true },
   { label: "nav.models", href: "/admin/models", icon: Brain, adminOnly: true },
-  { label: "nav.pipeline", href: "/admin/pipeline", icon: GitBranch, adminOnly: true },
+  // Pipeline removed — belongs to Streamlit lab only
   { label: "nav.statistics", href: "/admin/statistics", icon: BarChart3, adminOnly: true },
   { label: "nav.reports", href: "/admin/reports", icon: FileText, adminOnly: true },
   { label: "nav.users", href: "/admin/users", icon: Users, adminOnly: true },

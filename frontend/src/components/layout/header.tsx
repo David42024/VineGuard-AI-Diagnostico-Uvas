@@ -24,7 +24,6 @@ const pageTitles: Record<string, string> = {
   "/dashboard/history": "history.title",
   "/dashboard/diseases": "nav.info",
   "/admin/models": "models.title",
-  "/admin/pipeline": "pipeline.title",
   "/admin/statistics": "statistics.title",
   "/admin/reports": "reports.title",
   "/admin/users": "nav.users",

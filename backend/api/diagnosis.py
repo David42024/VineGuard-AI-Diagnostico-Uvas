@@ -42,7 +42,7 @@ from src.services.prediction_service import (
     DISEASE_CLASSES,
     DISEASE_INFO,
 )
-from src.model_registry import MODEL_DISPLAY_NAMES
+from src.model_registry import MODEL_DISPLAY_NAMES, MODEL_KEYS
 
 router = APIRouter(prefix="/api/v1/diagnoses", tags=["diagnoses"])
 
@@ -126,23 +126,26 @@ def create_diagnosis(
     from PIL import Image
     pil_image = Image.open(image_path).convert("RGB")
 
+    mode = "single"
+    mode_label = ""
+    predictions_list = []
+    consensus_out = None
+
     if model_key == "consensus":
+        mode = "consensus"
+        mode_label = "Consenso de 5 modelos"
         load_all_models()
         consensus = predict_consensus(pil_image)
         if consensus["status"] == "error":
             raise HTTPException(status_code=500, detail=consensus.get("error", "Error en predicción"))
 
-        primary = consensus["primary_result"]
         result_class = consensus["predicted_class"]
         confidence = consensus["confidence"]
-        used_model = primary["model_key"]
-        inf_time = primary["inference_time_ms"]
+        used_model = "consensus"
+        inf_time = sum(r.get("inference_time_ms", 0) for r in consensus.get("individual_results", []))
 
         raw_probs_list = None
-        if primary.get("probabilities") is not None:
-            raw_probs_list = primary["probabilities"]
 
-        predictions_list = []
         for r in consensus.get("individual_results", []):
             predictions_list.append(PredictionDetail(
                 model_key=r["model_key"],
@@ -158,11 +161,113 @@ def create_diagnosis(
             status=consensus["status"],
             predicted_class=consensus["predicted_class"],
             confidence=consensus["confidence"],
+            confidence_description=consensus.get("confidence_description", ""),
             agreement_level=consensus["agreement_level"],
             agreeing_models=consensus["agreeing_models"],
             total_models=consensus["total_models"],
+            vote_distribution=consensus.get("vote_distribution"),
+            tie_breaker=consensus.get("tie_breaker"),
         )
+    elif model_key == "best_model":
+        mode = "best_model"
+        mode_label = "Mejor Modelo"
+        from src.mantenedor import MODELS_DIR
+        from src.predecir_imagen import _extractores, _modelos, _cargar_modelo_h1
+        import tensorflow as tf
+        import joblib
+        import json as _json
+
+        modelo_final_json = MODELS_DIR / "modelo_final" / "modelo_final.json"
+        resolved_key = "H1"
+        resolved_name = "H1 - CNN + SVM"
+
+        if modelo_final_json.exists():
+            with open(modelo_final_json, encoding="utf-8") as f:
+                data = _json.load(f)
+            winner_label = data.get("modelo_ganador", "")
+            if "H2" in winner_label:
+                resolved_key = "H2"
+                resolved_name = "H2 - MobileNetV2 + RF"
+            # Load final artifacts from modelo_final/
+            final_dir = MODELS_DIR / "modelo_final"
+            final_extractor = final_dir / "h1_cnn_feature_extractor.h5"
+            final_svm = final_dir / "h1_svm_classifier.pkl"
+            if final_extractor.exists() and final_svm.exists():
+                tf.get_logger().setLevel("ERROR")
+                _extractores["H1_extractor"] = tf.keras.models.load_model(
+                    str(final_extractor), compile=False
+                )
+                _modelos["H1_svm"] = joblib.load(str(final_svm))
+                _modelos["H1"] = _modelos["H1_svm"]
+            else:
+                _cargar_modelo_h1()
+        else:
+            _cargar_modelo_h1()
+
+        result = predict_from_image(pil_image, resolved_key)
+        result_class = result["predicted_class"]
+        confidence = result["confidence"]
+        used_model = resolved_key
+        inf_time = result["inference_time_ms"]
+        raw_probs_list = result.get("probabilities")
+    elif model_key == "all":
+        mode = "compare_all"
+        mode_label = "Todos los Modelos"
+        load_all_models()
+        consensus = predict_consensus(pil_image)
+        if consensus["status"] == "error":
+            raise HTTPException(status_code=500, detail=consensus.get("error", "Error en predicción"))
+        result_class = consensus["predicted_class"]
+        confidence = consensus["confidence"]
+        used_model = "all"
+        inf_time = sum(r.get("inference_time_ms", 0) for r in consensus.get("individual_results", []))
+        raw_probs_list = None
+        for r in consensus.get("individual_results", []):
+            predictions_list.append(PredictionDetail(
+                model_key=r["model_key"],
+                model_name=r.get("model_name", r["model_key"]),
+                predicted_class=r["predicted_class"],
+                confidence=r.get("confidence"),
+                probabilities=r.get("probabilities"),
+                inference_time_ms=r.get("inference_time_ms"),
+                status=r.get("status", "success"),
+            ).model_dump())
+        consensus_out = ConsensusInfo(
+            status=consensus["status"],
+            predicted_class=consensus["predicted_class"],
+            confidence=consensus["confidence"],
+            confidence_description=consensus.get("confidence_description", ""),
+            agreement_level=consensus["agreement_level"],
+            agreeing_models=consensus["agreeing_models"],
+            total_models=consensus["total_models"],
+            vote_distribution=consensus.get("vote_distribution"),
+            tie_breaker=consensus.get("tie_breaker"),
+        )
+    elif model_key == "all":
+        load_all_models()
+        consensus = predict_consensus(pil_image)
+        if consensus["status"] == "error":
+            raise HTTPException(status_code=500, detail=consensus.get("error", "Error en predicción"))
+        result_class = consensus["predicted_class"]
+        confidence = consensus["confidence"]
+        predictions_list = []
+        for r in consensus.get("individual_results", []):
+            predictions_list.append(PredictionDetail(
+                model_key=r["model_key"],
+                model_name=r.get("model_name", r["model_key"]),
+                predicted_class=r["predicted_class"],
+                confidence=r.get("confidence"),
+                probabilities=r.get("probabilities"),
+                inference_time_ms=r.get("inference_time_ms"),
+                status=r.get("status", "success"),
+            ).model_dump())
+        used_model = "all"
+        inf_time = sum(r.get("inference_time_ms", 0) for r in consensus.get("individual_results", []))
+        raw_probs_list = None
+        consensus_out = None
     else:
+        if model_key not in MODEL_KEYS:
+            raise HTTPException(status_code=400, detail=f"model_key inválido: {model_key}. Valores válidos: {', '.join(MODEL_KEYS)}")
         load_single_model(model_key)
         result = predict_from_image(pil_image, model_key)
         result_class = result["predicted_class"]
@@ -170,8 +275,7 @@ def create_diagnosis(
         used_model = result["model_key"]
         inf_time = result["inference_time_ms"]
         raw_probs_list = result.get("probabilities")
-        predictions_list = []
-        consensus_out = None
+        mode_label = MODEL_DISPLAY_NAMES.get(model_key, model_key)
 
     probabilities_dict = {}
     if raw_probs_list:
@@ -196,6 +300,7 @@ def create_diagnosis(
     print(f"\n[API] Diagnóstico #{diag_id} guardado en DB exitosamente")
     print(f"[API]    └── Resultado: {result_class}")
     print(f"[API]    └── Confianza: {confidence:.2%}")
+    print(f"[API]    └── Modo: {mode}")
     print(f"[API]    └── Modelo: {used_model}")
     print(f"[API]    └── Usuario: {current_user.sub}")
     print(f"[API]    └── Demo: {is_demo}\n")
@@ -211,10 +316,22 @@ def create_diagnosis(
     if confidence is not None and confidence < 0.5:
         warnings.append("Baja confianza en la predicción")
 
+    # Build model info for the response based on mode
+    if mode == "consensus":
+        model_info = ModelInfoDiagnosis(key="consensus", name="Consenso de 5 modelos", version="1.0.0")
+    elif mode == "best_model":
+        model_info = ModelInfoDiagnosis(key="best_model", name=resolved_name if model_key == "best_model" else used_model, version="1.0.0")
+    elif mode == "compare_all":
+        model_info = ModelInfoDiagnosis(key="all", name="Todos los Modelos", version="1.0.0")
+    else:
+        model_info = _resolve_model_info(used_model)
+
     return DiagnosisResponse(
         id=diag_id,
         created_at=datetime.now(),
         status="completed",
+        mode=mode,
+        mode_label=mode_label,
         is_demo=is_demo,
         image_url=f"/api/v1/diagnoses/{diag_id}/image",
         prediction=PredictionInfo(
@@ -224,7 +341,7 @@ def create_diagnosis(
             health_status=disease_info.get("health_status", "unknown"),
             risk_level=disease_info.get("risk_level", "unknown"),
         ),
-        model=_resolve_model_info(used_model),
+        model=model_info,
         probabilities=probs_dict,
         inference_time_ms=inf_time,
         consensus=consensus_out,

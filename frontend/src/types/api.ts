@@ -43,9 +43,12 @@ export interface ConsensusInfo {
   status: string;
   predicted_class?: string;
   confidence?: number;
+  confidence_description?: string;
   agreement_level?: string;
   agreeing_models?: number;
   total_models?: number;
+  vote_distribution?: Record<string, number>;
+  tie_breaker?: string;
 }
 
 export interface PredictionDetail {
@@ -63,6 +66,8 @@ export interface DiagnosisResponse {
   id: number;
   created_at?: string;
   status: string;
+  mode: string;
+  mode_label: string;
   is_demo: boolean;
   image_url?: string;
   prediction: PredictionInfo;
@@ -124,7 +129,8 @@ export interface ModelRanking {
   ranking: number;
   modelo: string;
   accuracy: number;
-  f1_score: number;
+  f1_score?: number;
+  f1_macro?: number;
   mcc: number;
   acc_ci_inf: number;
   acc_ci_sup: number;
@@ -141,6 +147,21 @@ export interface BestModelResponse {
   mcc: number;
   selection_criteria: string;
   details?: string;
+  // Rich fields from modelo_final.json
+  modelo_ganador?: string;
+  fecha_seleccion?: string;
+  criterio_seleccion?: string[];
+  metricas_test?: {
+    accuracy: number;
+    f1_macro: number;
+    mcc: number;
+  };
+  victorias_significativas_holm?: number;
+  requiere_reentrenamiento?: boolean;
+  artefactos?: Array<{
+    tipo: string;
+    nombre_archivo: string;
+  }>;
 }
 
 export interface ModelTestResponse {
@@ -187,6 +208,90 @@ export interface SummaryResponse {
   best_model: string;
   ranking: { modelo: string; accuracy: number; f1_score: number; recall?: number }[];
   cross_validation: { modelo: string; accuracy_mean: number; accuracy_std: number }[];
+}
+
+// ─── Normalized Statistics Types ───────────────────────────────────
+
+export interface ModelComparisonRow {
+  modelo: string;
+  accuracy: number | null;
+  balancedAccuracy: number | null;
+  precisionMacro: number | null;
+  recallMacro: number | null;
+  f1Macro: number | null;
+  mcc: number | null;
+  aucMacro?: number | null;
+  inferenceTimeMs?: number | null;
+}
+
+export interface CrossValSummaryRow {
+  modelo: string;
+  nFolds: number;
+  accuracyMean: number | null;
+  accuracyStd: number | null;
+  balancedAccuracyMean: number | null;
+  balancedAccuracyStd: number | null;
+  precisionMacroMean: number | null;
+  precisionMacroStd: number | null;
+  recallMacroMean: number | null;
+  recallMacroStd: number | null;
+  f1MacroMean: number | null;
+  f1MacroStd: number | null;
+  mccMean: number | null;
+  mccStd: number | null;
+}
+
+export interface CrossValFoldRow {
+  modelo: string;
+  fold: number;
+  nTrain?: number;
+  nValidacion?: number;
+  accuracy: number | null;
+  balancedAccuracy: number | null;
+  f1Macro: number | null;
+  mcc: number | null;
+}
+
+export interface BootstrapRow {
+  modelo: string;
+  accuracyMean: number | null;
+  accuracyCiLow: number | null;
+  accuracyCiHigh: number | null;
+  f1MacroMean: number | null;
+  f1MacroCiLow: number | null;
+  f1MacroCiHigh: number | null;
+  mccMean: number | null;
+  mccCiLow: number | null;
+  mccCiHigh: number | null;
+}
+
+export interface CochranQ {
+  estadisticoQ: number | null;
+  pValue: number | null;
+  interpretacion: string;
+  k: number;
+  n: number;
+}
+
+export interface McNemarHolmRow {
+  modelo1: string;
+  modelo2: string;
+  b: number;
+  c: number;
+  pRaw: number | null;
+  pHolm: number | null;
+  significativo: boolean;
+  favorecido: string;
+}
+
+export interface EffectSizeRow {
+  modelo1: string;
+  modelo2: string;
+  diffAccuracy: number | null;
+  diffF1Macro: number | null;
+  diffMcc: number | null;
+  oddsRatio: number | null;
+  favorecido: string;
 }
 
 // ─── Errors ──────────────────────────────────────────────────────

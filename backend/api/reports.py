@@ -658,12 +658,17 @@ def generate_report(
         raise HTTPException(status_code=403, detail="No autorizado")
 
     fmt = payload.format.lower()
-    if fmt == "pdf":
-        output_path = _generate_pdf_report(diag)
-    elif fmt == "xlsx":
-        output_path = _generate_excel_report(diag)
-    else:
-        output_path = _generate_docx_report(diag)
+    try:
+        if fmt == "pdf":
+            output_path = _generate_pdf_report(diag)
+        elif fmt == "xlsx":
+            output_path = _generate_excel_report(diag)
+        else:
+            output_path = _generate_docx_report(diag)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar reporte: {e}. Verifica que las dependencias python-docx, openpyxl y/o reportlab estén instaladas.")
 
     return {
         "message": "Reporte generado exitosamente",

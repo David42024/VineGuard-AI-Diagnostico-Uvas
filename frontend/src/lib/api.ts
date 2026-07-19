@@ -90,4 +90,50 @@ export const modelsApi = {
   },
 };
 
+// Funciones de estadisticas
+export interface ModelComparisonResponse {
+  comparison: import("@/types/api").ModelComparisonRow[];
+  effectSize: import("@/types/api").EffectSizeRow[];
+}
+
+export interface CrossValidationResponse {
+  resultados: import("@/types/api").CrossValSummaryRow[];
+  porFold: import("@/types/api").CrossValFoldRow[];
+}
+
+export interface BootstrapResponse {
+  bootstrap: import("@/types/api").BootstrapRow[];
+}
+
+export interface McNemarResponse {
+  holmPosthoc: import("@/types/api").McNemarHolmRow[];
+}
+
+export interface CochranResponse {
+  cochranQ: import("@/types/api").CochranQ | null;
+}
+
+export const statisticsApi = {
+  getModelComparison: async (): Promise<ModelComparisonResponse> => {
+    const response = await api.get<ModelComparisonResponse>("/statistics/model-comparison");
+    return response.data;
+  },
+  getCrossValidation: async (): Promise<CrossValidationResponse> => {
+    const response = await api.get<CrossValidationResponse>("/statistics/cross-validation");
+    return response.data;
+  },
+  getBootstrap: async (): Promise<BootstrapResponse> => {
+    const response = await api.get<BootstrapResponse>("/statistics/bootstrap");
+    return response.data;
+  },
+  getMcNemar: async (): Promise<McNemarResponse> => {
+    const response = await api.get<McNemarResponse>("/statistics/mcnemar");
+    return response.data;
+  },
+  getCochran: async (): Promise<CochranResponse> => {
+    const response = await api.get<CochranResponse>("/statistics/cochran");
+    return response.data;
+  },
+};
+
 export default api;

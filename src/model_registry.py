@@ -31,7 +31,10 @@ MODEL_DISPLAY_NAMES = {
     "M2": "M2 - Random Forest",
     "M3": "M3 - KNN",
     "H1": "H1 - CNN + SVM",
-    "H2": "H2 - Transfer + RF",
+    "H2": "H2 - MobileNetV2 + RF",
+    "all": "Todos los Modelos",
+    "consensus": "Consenso de 5 modelos",
+    "best_model": "Mejor Modelo",
 }
 
 MODEL_TYPES = {
@@ -39,7 +42,7 @@ MODEL_TYPES = {
     "M2": "Classic ML (Random Forest)",
     "M3": "Classic ML (KNN)",
     "H1": "Hybrid (CNN + SVM)",
-    "H2": "Hybrid (Transfer + RF)",
+    "H2": "Hybrid (MobileNetV2 + RF)",
 }
 
 MODEL_REPORT_DIRS = {

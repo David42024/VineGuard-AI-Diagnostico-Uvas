@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search,
   Activity,
@@ -16,6 +18,7 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { useAuthStore } from "@/store/auth-store";
+import api from "@/lib/api";
 
 const tips = [
   {
@@ -37,6 +40,27 @@ const tips = [
 
 export default function ClientDashboard() {
   const { user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<{
+    totalDiagnostics: number;
+    healthyPct: number;
+    diseasedCount: number;
+    lastResult: string;
+  } | null>(null);
+
+  useEffect(() => {
+    api.get("/statistics/my-summary").then((res) => {
+      const d = res.data;
+      setStats({
+        totalDiagnostics: d.total_diagnostics ?? 0,
+        healthyPct: d.healthy_pct ?? 0,
+        diseasedCount: Math.round((d.diseased_pct ?? 0) * (d.total_diagnostics ?? 0) / 100),
+        lastResult: d.last_diagnosis?.result?.replace(/_/g, " ") || (d.today_diagnostics > 0 ? "Hoy" : "—"),
+      });
+    }).catch(() => {
+      setStats({ totalDiagnostics: 0, healthyPct: 0, diseasedCount: 0, lastResult: "—" });
+    }).finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -49,32 +73,34 @@ export default function ClientDashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Diagnósticos Totales"
-          value={42}
-          icon={Activity}
-        />
-        <MetricCard
-          title="Hojas Sanas"
-          value="64%"
-          icon={Leaf}
-          trend="up"
-          trendValue="+8%"
-        />
-        <MetricCard
-          title="Enfermedades Detectadas"
-          value={15}
-          icon={Bug}
-          trend="down"
-          trendValue="-3%"
-        />
-        <MetricCard
-          title="Último Resultado"
-          value="Hace 2 horas"
-          icon={Clock}
-        />
-      </div>
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            title="Diagnósticos Totales"
+            value={stats?.totalDiagnostics ?? 0}
+            icon={Activity}
+          />
+          <MetricCard
+            title="Hojas Sanas"
+            value={stats != null ? `${stats.healthyPct}%` : "0%"}
+            icon={Leaf}
+          />
+          <MetricCard
+            title="Enfermedades Detectadas"
+            value={stats?.diseasedCount ?? 0}
+            icon={Bug}
+          />
+          <MetricCard
+            title="Último Resultado"
+            value={stats?.lastResult ?? "—"}
+            icon={Clock}
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
@@ -136,42 +162,59 @@ export default function ClientDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {[
-              { file: "hoja_vid_01.jpg", result: "Sana", date: "Hace 2 horas", confidence: "98.5%" },
-              { file: "hoja_vid_02.jpg", result: "Podredumbre Negra", date: "Ayer", confidence: "94.2%" },
-              { file: "hoja_vid_03.jpg", result: "Esca", date: "Hace 3 días", confidence: "89.7%" },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                    <Leaf className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{item.file}</p>
-                    <p className="text-xs text-muted-foreground">{item.date}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge
-                    variant={
-                      item.result === "Sana" ? "success" : "destructive"
-                    }
-                  >
-                    {item.result}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {item.confidence}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <RecentDiagnostics />
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function RecentDiagnostics() {
+  const [items, setItems] = useState<Array<{ filename: string; result: string; date: string; confidence: string }>>([]);
+  useEffect(() => {
+    api.get("/diagnoses?limit=3").then((res) => {
+      const list = (res.data?.items || []).map((d: { filename?: string; result: string; created_at?: string; confidence?: number }) => ({
+        filename: d.filename || "desconocido",
+        result: d.result?.replace(/_/g, " ") || "—",
+        date: d.created_at ? new Date(d.created_at).toLocaleDateString("es-ES") : "—",
+        confidence: d.confidence != null ? `${(d.confidence * 100).toFixed(1)}%` : "—",
+      }));
+      setItems(list);
+    }).catch(() => setItems([]));
+  }, []);
+  if (items.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">No hay diagnósticos recientes</p>;
+  }
+  return (
+    <div className="space-y-4">
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between rounded-lg border p-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+              <Leaf className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{item.filename}</p>
+              <p className="text-xs text-muted-foreground">{item.date}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge
+              variant={
+                item.result === "Healthy" ? "success" : "destructive"
+              }
+            >
+              {item.result}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {item.confidence}
+            </span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

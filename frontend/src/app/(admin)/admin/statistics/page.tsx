@@ -21,75 +21,64 @@ import {
   AlertCircle,
   Lightbulb,
   Loader2,
+  Minus,
 } from "lucide-react";
-import api from "@/lib/api";
+import type {
+  ModelComparisonRow,
+  CrossValSummaryRow,
+  CrossValFoldRow,
+  BootstrapRow,
+  McNemarHolmRow,
+  EffectSizeRow,
+  CochranQ,
+} from "@/types/api";
+import { statisticsApi } from "@/lib/api";
 
-interface RankingRow {
-  modelo: string;
-  accuracy: number;
-  f1_score: number;
-  f1_macro?: number;
-  mcc?: number;
-  precision?: number;
-  recall?: number;
-  acc_ci_inf: number;
-  acc_ci_sup: number;
+// ── Format helpers ─────────────────────────────────────────────────
+
+function val<T>(v: T | undefined | null): v is T {
+  return v !== null && v !== undefined && !Number.isNaN(Number(v));
 }
 
-interface CrossValFold {
-  modelo?: string;
-  fold: string;
-  accuracy: number;
-  f1_macro: number;
-  mcc?: number;
+function formatPct(v: number | null | undefined): string {
+  if (!val(v)) return "\u2014";
+  return `${(v * 100).toFixed(2)}%`;
 }
 
-interface CrossValSummary {
-  modelo: string;
-  accuracy_mean: number;
-  accuracy_std: number;
-  f1_mean: number;
-  f1_std: number;
-  mcc_mean: number;
-  mcc_std: number;
+function formatDecimal(v: number | null | undefined, digits = 4): string {
+  if (!val(v)) return "\u2014";
+  return v!.toFixed(digits);
 }
 
-interface BootstrapRow {
-  modelo: string;
-  metric: string;
-  mean: number;
-  ci_inf: number;
-  ci_sup: number;
+function formatPValue(v: number | null | undefined): string {
+  if (!val(v)) return "\u2014";
+  if (v! < 0.0001) return "< 0.0001";
+  return v!.toFixed(4);
 }
 
-interface McNemarRow {
-  comparacion: string;
-  estadistico: number;
-  p_valor: number;
-  significancia: string;
+function getF1Macro(row: ModelComparisonRow): number | null {
+  return row.f1Macro;
 }
 
-interface CochranQ {
-  q_statistic: number;
-  p_value: number;
-  significancia: string;
+function sortByMccDesc(a: ModelComparisonRow, b: ModelComparisonRow) {
+  const ma = a.mcc ?? -1;
+  const mb = b.mcc ?? -1;
+  return mb - ma;
 }
 
-interface FlatModel {
-  model: string;
-  accuracy: number;
-  precision: number;
-  recall: number;
-  f1: number;
-  auc: number;
+function getShortName(modelo: string): string {
+  return modelo.replace(/ - .*/, "");
 }
+
+// ── Component ──────────────────────────────────────────────────────
 
 export default function StatisticsPage() {
-  const [ranking, setRanking] = useState<RankingRow[]>([]);
-  const [cvPorFold, setCvPorFold] = useState<CrossValFold[]>([]);
-  const [cvResultados, setCvResultados] = useState<CrossValSummary[]>([]);
+  const [comparison, setComparison] = useState<ModelComparisonRow[]>([]);
+  const [cvResultados, setCvResultados] = useState<CrossValSummaryRow[]>([]);
+  const [cvPorFold, setCvPorFold] = useState<CrossValFoldRow[]>([]);
   const [bootstrap, setBootstrap] = useState<BootstrapRow[]>([]);
-  const [mcnemar, setMcNemar] = useState<McNemarRow[]>([]);
+  const [mcnemar, setMcNemar] = useState<McNemarHolmRow[]>([]);
+  const [effectSize, setEffectSize] = useState<EffectSizeRow[]>([]);
   const [cochran, setCochran] = useState<CochranQ | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -98,42 +87,20 @@ export default function StatisticsPage() {
     setLoading(true);
     setError("");
     try {
-      const [compRes, cvRes, bootRes, mcnRes, cochRes] = await Promise.all([
-        api.get<{ ranking: RankingRow[] }>("/statistics/model-comparison").catch(() => ({ data: { ranking: [], effect_size: [] } })),
-        api.get<{ resultados: CrossValSummary[]; por_fold: CrossValFold[] }>("/statistics/cross-validation").catch(() => ({ data: { resultados: [], por_fold: [] } })),
-        api.get<{ bootstrap_intervals: BootstrapRow[] }>("/statistics/bootstrap").catch(() => ({ data: { bootstrap_intervals: [] } })),
-        api.get<{ resultados: McNemarRow[] }>("/statistics/mcnemar").catch(() => ({ data: { resultados: [], holm_posthoc: [] } })),
-        api.get<{ cochran_q: CochranQ }>("/statistics/cochran").catch(() => ({ data: { cochran_q: null } })),
+      const [comp, cv, boot, mcn, coch] = await Promise.all([
+        statisticsApi.getModelComparison(),
+        statisticsApi.getCrossValidation(),
+        statisticsApi.getBootstrap(),
+        statisticsApi.getMcNemar(),
+        statisticsApi.getCochran(),
       ]);
-      setRanking((compRes.data.ranking ?? []).map((r) => ({
-        ...r,
-        accuracy: Number(r.accuracy),
-        precision: r.precision != null ? Number(r.precision) : undefined,
-        recall: r.recall != null ? Number(r.recall) : undefined,
-        f1_score: Number(r.f1_score),
-        f1_macro: r.f1_macro != null ? Number(r.f1_macro) : undefined,
-        mcc: r.mcc != null ? Number(r.mcc) : undefined,
-      })));
-      setCvPorFold((cvRes.data.por_fold ?? []).map((cv) => ({
-        ...cv,
-        accuracy: Number(cv.accuracy),
-        f1_macro: Number(cv.f1_macro),
-        mcc: cv.mcc != null ? Number(cv.mcc) : undefined,
-      })));
-      setBootstrap((bootRes.data.bootstrap_intervals ?? []).map((b) => ({
-        ...b,
-        mean: Number(b.mean),
-        ci_inf: Number(b.ci_inf),
-        ci_sup: Number(b.ci_sup),
-      })));
-      setMcNemar((mcnRes.data.resultados ?? []).map((r) => ({
-        ...r,
-        estadistico: Number(r.estadistico),
-        p_valor: Number(r.p_valor),
-      })));
-      setCochran(cochRes.data.cochran_q
-        ? { ...cochRes.data.cochran_q, q_statistic: Number(cochRes.data.cochran_q.q_statistic), p_value: Number(cochRes.data.cochran_q.p_value) }
-        : null);
+      setComparison(comp.comparison ?? []);
+      setEffectSize(comp.effectSize ?? []);
+      setCvResultados(cv.resultados ?? []);
+      setCvPorFold(cv.porFold ?? []);
+      setBootstrap(boot.bootstrap ?? []);
+      setMcNemar(mcn.holmPosthoc ?? []);
+      setCochran(coch.cochranQ);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al cargar estadisticas");
     } finally {
@@ -145,22 +112,11 @@ export default function StatisticsPage() {
     fetchData();
   }, []);
 
-  if (error && ranking.length === 0) {
+  if (error && comparison.length === 0) {
     return <ErrorState message={error} onRetry={fetchData} />;
   }
 
-  const flatModels: FlatModel[] = ranking.map((r) => ({
-    model: r.modelo,
-    accuracy: r.accuracy,
-    precision: r.precision ?? 0,
-    recall: r.recall ?? 0,
-    f1: r.f1_score ?? r.f1_macro,
-    auc: 0,
-  }));
-
-  const cvMean = cvPorFold.length > 0
-    ? cvPorFold.reduce((a, c) => a + c.accuracy, 0) / cvPorFold.length
-    : 0;
+  const sortedComp = [...comparison].sort(sortByMccDesc);
 
   return (
     <div className="space-y-6">
@@ -181,15 +137,16 @@ export default function StatisticsPage() {
           <TabsTrigger value="tests">Pruebas Estadisticas</TabsTrigger>
         </TabsList>
 
+        {/* ──────── COMPARISON TAB ──────── */}
         <TabsContent value="comparison" className="space-y-6">
-          {loading && ranking.length === 0 ? (
+          {loading && comparison.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Cargando...
             </div>
-          ) : flatModels.length === 0 ? (
+          ) : comparison.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No hay datos de comparacion. Ejecuta los entrenamientos desde Streamlit.
+              No hay datos de comparacion. Ejecuta <code>src/evaluacion_comparativa.py</code>.
             </p>
           ) : (
             <>
@@ -205,22 +162,24 @@ export default function StatisticsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Modelo</TableHead>
-                        <TableHead>Precision</TableHead>
-                        <TableHead>Precision</TableHead>
-                        <TableHead>Recall</TableHead>
-                        <TableHead>F1-Score</TableHead>
+                        <TableHead>Accuracy</TableHead>
+                        <TableHead>Balanced Accuracy</TableHead>
+                        <TableHead>Precision macro</TableHead>
+                        <TableHead>Recall macro</TableHead>
+                        <TableHead>F1-macro</TableHead>
                         <TableHead>MCC</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {flatModels.map((m) => (
-                        <TableRow key={m.model}>
-                          <TableCell className="font-medium">{m.model}</TableCell>
-                          <TableCell>{(m.accuracy * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{(m.precision * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{(m.recall * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{(m.f1 * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{ranking.find((r) => r.modelo === m.model)?.mcc?.toFixed(4) ?? "N/A"}</TableCell>
+                      {sortedComp.map((m) => (
+                        <TableRow key={m.modelo}>
+                          <TableCell className="font-medium">{m.modelo}</TableCell>
+                          <TableCell>{formatPct(m.accuracy)}</TableCell>
+                          <TableCell>{formatPct(m.balancedAccuracy)}</TableCell>
+                          <TableCell>{formatPct(m.precisionMacro)}</TableCell>
+                          <TableCell>{formatPct(m.recallMacro)}</TableCell>
+                          <TableCell>{formatPct(getF1Macro(m))}</TableCell>
+                          <TableCell className="font-mono">{formatDecimal(m.mcc)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -231,11 +190,18 @@ export default function StatisticsPage() {
                       Interpretacion
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Esta tabla compara las <strong>metricas principales</strong> de todos los
-                      modelos entrenados. El MCC (coeficiente de correlacion de Matthews) es la
-                      metrica mas importante &mdash; un valor cercano a 1 indica prediccion perfecta,
-                      cercano a 0 indica rendimiento aleatorio, y negativo indica discordancia
-                      sistematica. El F1-score balancea precision y recall.
+                      Esta tabla compara las metricas principales de todos los
+                      modelos. El MCC es la metrica mas importante — un valor
+                      cercano a 1 indica prediccion perfecta. F1-macro balancea
+                      precision y recall por clase.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      <strong>Balanced Accuracy</strong> mide el recall promedio
+                      entre las clases y da el mismo peso a cada una, por lo que
+                      resulta util cuando existe desbalance de datos. En este
+                      analisis multiclase, Balanced Accuracy coincide con Recall
+                      macro porque ambas representan el promedio del recall de
+                      las clases.
                     </p>
                   </div>
                 </CardContent>
@@ -247,94 +213,188 @@ export default function StatisticsPage() {
                 </CardHeader>
                 <CardContent>
                   <BarChart
-                    data={flatModels.map((m) => ({
-                      ...m,
-                      accuracy: m.accuracy * 100,
-                      f1: m.f1 * 100,
+                    data={sortedComp.map((m) => ({
+                      name: getShortName(m.modelo),
+                      fullName: m.modelo,
+                      mcc: m.mcc != null ? +(m.mcc * 100).toFixed(1) : 0,
+                      f1: getF1Macro(m) != null ? +(getF1Macro(m)! * 100).toFixed(1) : 0,
+                      accuracy: m.accuracy != null ? +(m.accuracy * 100).toFixed(1) : 0,
                     }))}
-                    xKey="model"
+                    xKey="name"
                     bars={[
-                      { key: "accuracy", color: "#22C55E", name: "Precision (%)" },
-                      { key: "f1", color: "#166534", name: "F1 (%)" },
+                      { key: "mcc", color: "#2563EB", name: "MCC (%)" },
+                      { key: "f1", color: "#166534", name: "F1-macro (%)" },
+                      { key: "accuracy", color: "#22C55E", name: "Accuracy (%)" },
                     ]}
                   />
                 </CardContent>
               </Card>
+
+              {effectSize.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Tamano del Efecto</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Modelo 1</TableHead>
+                          <TableHead>Modelo 2</TableHead>
+                          <TableHead>Diff Accuracy</TableHead>
+                          <TableHead>Diff F1-macro</TableHead>
+                          <TableHead>Diff MCC</TableHead>
+                          <TableHead>Odds Ratio</TableHead>
+                          <TableHead>Favorecido</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {effectSize.map((e, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{e.modelo1}</TableCell>
+                            <TableCell>{e.modelo2}</TableCell>
+                            <TableCell>{formatPct(e.diffAccuracy)}</TableCell>
+                            <TableCell>{formatPct(e.diffF1Macro)}</TableCell>
+                            <TableCell className="font-mono">{formatDecimal(e.diffMcc)}</TableCell>
+                            <TableCell className="font-mono">{formatDecimal(e.oddsRatio, 4)}</TableCell>
+                            <TableCell>
+                              <Badge variant={e.favorecido === e.modelo1 ? "success" : e.favorecido === "Empate" ? "secondary" : "warning"}>
+                                {e.favorecido}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        Interpretacion
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Diferencias positivas favorecen al Modelo 1. El odds
+                        ratio indica que tan mas frecuente es que un modelo
+                        acierte cuando el otro falla. Valores &gt; 1 favorecen
+                        al primer modelo.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </>
           )}
         </TabsContent>
 
+        {/* ──────── CROSS VALIDATION TAB ──────── */}
         <TabsContent value="crossval" className="space-y-6">
-          {loading && cvPorFold.length === 0 ? (
+          {loading && cvResultados.length === 0 && cvPorFold.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Cargando...
             </div>
-          ) : cvPorFold.length === 0 ? (
+          ) : cvResultados.length === 0 && cvPorFold.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No hay datos de validacion cruzada. Ejecuta la validacion desde Streamlit.
+              No hay datos de validacion cruzada. Ejecuta <code>src/cross_validation_modelos.py</code>.
             </p>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  Validacion Cruzada (5-Folds)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fold</TableHead>
-                      <TableHead>Modelo</TableHead>
-                      <TableHead>Precision</TableHead>
-                      <TableHead>F1-Macro</TableHead>
-                      <TableHead>MCC</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cvPorFold.map((cv, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">{cv.fold}</TableCell>
-                        <TableCell>{cv.modelo ?? "&mdash;"}</TableCell>
-                        <TableCell>
-                          <Badge variant="success">
-                            {(cv.accuracy * 100).toFixed(1)}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{(cv.f1_macro * 100).toFixed(1)}%</TableCell>
-                        <TableCell>{cv.mcc?.toFixed(4) ?? "N/A"}</TableCell>
-                      </TableRow>
+            <>
+              {cvPorFold.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      Validacion Cruzada — Detalle por Fold
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fold</TableHead>
+                          <TableHead>Modelo</TableHead>
+                          <TableHead>Accuracy</TableHead>
+                          <TableHead>F1-macro</TableHead>
+                          <TableHead>MCC</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cvPorFold.map((cv, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">Fold {cv.fold}</TableCell>
+                            <TableCell>{cv.modelo}</TableCell>
+                            <TableCell>
+                              <Badge variant="success">{formatPct(cv.accuracy)}</Badge>
+                            </TableCell>
+                            <TableCell>{formatPct(cv.f1Macro)}</TableCell>
+                            <TableCell className="font-mono">{formatDecimal(cv.mcc)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {cvResultados.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Resumen por Modelo</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {cvResultados.map((m) => (
+                      <div key={m.modelo} className="space-y-2">
+                        <h4 className="font-semibold text-sm">{m.modelo}</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="p-3 bg-muted rounded-lg">
+                            <p className="text-xs text-muted-foreground">Accuracy media</p>
+                            <p className="text-lg font-bold">{formatPct(m.accuracyMean)}</p>
+                            <p className="text-xs text-muted-foreground">&plusmn; {formatPct(m.accuracyStd)}</p>
+                          </div>
+                          <div className="p-3 bg-muted rounded-lg">
+                            <p className="text-xs text-muted-foreground">F1-macro medio</p>
+                            <p className="text-lg font-bold">{formatPct(m.f1MacroMean)}</p>
+                            <p className="text-xs text-muted-foreground">&plusmn; {formatPct(m.f1MacroStd)}</p>
+                          </div>
+                          <div className="p-3 bg-muted rounded-lg">
+                            <p className="text-xs text-muted-foreground">MCC medio</p>
+                            <p className="text-lg font-bold">{formatDecimal(m.mccMean)}</p>
+                            <p className="text-xs text-muted-foreground">&plusmn; {formatDecimal(m.mccStd)}</p>
+                          </div>
+                          <div className="p-3 bg-muted rounded-lg">
+                            <p className="text-xs text-muted-foreground">Folds</p>
+                            <p className="text-lg font-bold">{m.nFolds}</p>
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Precision media:{" "}
-                    <span className="font-semibold text-foreground">
-                      {(cvMean * 100).toFixed(1)}%
-                    </span>
-                  </p>
-                </div>
-                <div className="mt-2 p-4 bg-muted rounded-lg space-y-1">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-amber-500" />
-                    Interpretacion
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    La validacion cruzada divide los datos en 5 particiones (folds) y
-                    evalua el modelo 5 veces, usando cada particion como test una vez.
-                    La <strong>precision media</strong> da una estimacion mas robusta del
-                    rendimiento real. Una baja variacion entre folds indica que el modelo
-                    es estable y no depende de una particion especifica.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        <strong>Nota:</strong> La validacion cruzada se realizo
+                        sobre TRAIN. No corresponde a la evaluacion final sobre
+                        TEST. Las metricas sobre TEST se encuentran en la pestana
+                        Comparacion.
+                      </p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg space-y-1">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        Interpretacion
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        La validacion cruzada divide los datos en {cvResultados[0]?.nFolds ?? "N"} particiones
+                        y evalua cada modelo en cada particion. La media y desviacion
+                        estandar resumen su estabilidad: baja desviacion indica
+                        rendimiento consistente entre folds.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </TabsContent>
 
+        {/* ──────── BOOTSTRAP TAB ──────── */}
         <TabsContent value="bootstrap" className="space-y-6">
           {loading && bootstrap.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -343,7 +403,8 @@ export default function StatisticsPage() {
             </div>
           ) : bootstrap.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No hay intervalos bootstrap. Ejecuta la validacion estadistica desde Streamlit.
+              No hay intervalos bootstrap. Ejecuta{" "}
+              <code>src/validacion_estadistica_modelos.py</code>.
             </p>
           ) : (
             <Card>
@@ -358,22 +419,34 @@ export default function StatisticsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Modelo</TableHead>
-                      <TableHead>Metrica</TableHead>
-                      <TableHead>Media</TableHead>
-                      <TableHead>IC Inferior</TableHead>
-                      <TableHead>IC Superior</TableHead>
+                      <TableHead>Accuracy media</TableHead>
+                      <TableHead>Accuracy IC 95%</TableHead>
+                      <TableHead>F1-macro medio</TableHead>
+                      <TableHead>F1-macro IC 95%</TableHead>
+                      <TableHead>MCC medio</TableHead>
+                      <TableHead>MCC IC 95%</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bootstrap.map((b, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">{b.modelo}</TableCell>
-                        <TableCell>{b.metric}</TableCell>
-                        <TableCell>{(b.mean * 100).toFixed(1)}%</TableCell>
-                        <TableCell>{(b.ci_inf * 100).toFixed(1)}%</TableCell>
-                        <TableCell>{(b.ci_sup * 100).toFixed(1)}%</TableCell>
-                      </TableRow>
-                    ))}
+                    {[...bootstrap]
+                      .sort((a, b) => (b.mccMean ?? 0) - (a.mccMean ?? 0))
+                      .map((b, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">{b.modelo}</TableCell>
+                          <TableCell>{formatPct(b.accuracyMean)}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            [{formatPct(b.accuracyCiLow)}, {formatPct(b.accuracyCiHigh)}]
+                          </TableCell>
+                          <TableCell>{formatPct(b.f1MacroMean)}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            [{formatPct(b.f1MacroCiLow)}, {formatPct(b.f1MacroCiHigh)}]
+                          </TableCell>
+                          <TableCell className="font-mono">{formatDecimal(b.mccMean)}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            [{formatDecimal(b.mccCiLow)}, {formatDecimal(b.mccCiHigh)}]
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
                 <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
@@ -382,11 +455,11 @@ export default function StatisticsPage() {
                     Interpretacion
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Los intervalos de confianza bootstrap al 95% indican el rango donde se
-                    encuentra la <strong>verdadera metrica</strong> con un 95% de confianza.
-                    Si los intervalos de dos modelos no se superponen, es una senal de que
-                    sus rendimientos son significativamente distintos. Intervalos anchos
-                    indican mayor incertidumbre en la estimacion.
+                    Los intervalos bootstrap al 95% indican el rango donde se
+                    encuentra la metrica real con un 95% de confianza.
+                    Intervalos con poca superposicion pueden sugerir diferencias,
+                    pero la significancia formal debe consultarse en Cochran Q y
+                    McNemar + Holm.
                   </p>
                 </div>
               </CardContent>
@@ -394,116 +467,187 @@ export default function StatisticsPage() {
           )}
         </TabsContent>
 
+        {/* ──────── STATISTICAL TESTS TAB ──────── */}
         <TabsContent value="tests" className="space-y-6">
-          {loading ? (
+          {loading && !cochran && mcnemar.length === 0 && effectSize.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Cargando...
             </div>
           ) : (
             <>
+              {/* Cochran Q */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-orange-600" />
-                    Prueba de McNemar
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {mcnemar.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No hay resultados de McNemar. Ejecuta la validacion estadistica desde Streamlit.
-                    </p>
-                  ) : (
-                    <>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Modelo A vs B</TableHead>
-                            <TableHead>Estadistico &chi;&sup2;</TableHead>
-                            <TableHead>Valor p</TableHead>
-                            <TableHead>Significancia</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {mcnemar.map((row, i) => (
-                            <TableRow key={i}>
-                              <TableCell>{row.comparacion}</TableCell>
-                              <TableCell>{row.estadistico.toFixed(2)}</TableCell>
-                              <TableCell>{row.p_valor.toFixed(4)}</TableCell>
-                              <TableCell>
-                                <Badge variant={row.significancia === "significativo" || row.significancia === "Significativo" ? "success" : "warning"}>
-                                  {row.significancia}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                      <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
-                        <p className="text-sm font-medium flex items-center gap-2">
-                          <Lightbulb className="h-4 w-4 text-amber-500" />
-                          Interpretacion
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          La prueba de McNemar compara si dos modelos tienen diferencias significativas
-                          en sus predicciones. Un <strong>valor p &lt; 0.05</strong> indica que los modelos
-                          se comportan de manera distinta (significativo). Si el valor p es alto
-                          (&ge; 0.05), no hay evidencia suficiente para decir que los modelos difieren.
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-purple-600" />
+                    <XCircle className="h-5 w-5 text-purple-600" />
                     Prueba de Cochran Q
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {!cochran ? (
                     <p className="text-sm text-muted-foreground">
-                      No hay resultados de Cochran Q. Ejecuta la validacion estadistica desde Streamlit.
+                      No hay resultados de Cochran Q. Ejecuta{" "}
+                      <code>src/validacion_estadistica_modelos.py</code>.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-muted-foreground">Estadistico Q</p>
+                          <p className="text-lg font-bold">{formatDecimal(cochran.estadisticoQ, 4)}</p>
+                        </div>
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-muted-foreground">Valor p</p>
+                          <p className="text-lg font-bold">{formatPValue(cochran.pValue)}</p>
+                        </div>
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-muted-foreground">Modelos (k)</p>
+                          <p className="text-lg font-bold">{cochran.k}</p>
+                        </div>
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-muted-foreground">Imagenes (n)</p>
+                          <p className="text-lg font-bold">{cochran.n}</p>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground">Interpretacion</p>
+                        <p className="text-sm font-semibold">{cochran.interpretacion}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        La prueba de Cochran Q evalua si todos los modelos tienen
+                        el mismo rendimiento de forma simultanea. Si el valor p es
+                        &lt; 0.05, se rechaza la hipotesis nula. En ese caso, el
+                        post-hoc de McNemar con correccion Holm identifica que
+                        pares tienen diferencias.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* McNemar + Holm */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <XCircle className="h-5 w-5 text-orange-600" />
+                    McNemar + Holm (Post-hoc)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {mcnemar.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay resultados de McNemar. Ejecuta{" "}
+                      <code>src/validacion_estadistica_modelos.py</code>.
                     </p>
                   ) : (
                     <>
-                      <div className="p-4 bg-muted rounded-lg space-y-2">
-                        <p className="text-sm">
-                          <span className="font-semibold">Estadistico Q:</span>{" "}
-                          {cochran.q_statistic.toFixed(2)}
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-semibold">Valor p:</span>{" "}
-                          {cochran.p_value.toFixed(4)}
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-semibold">Conclusion:</span>{" "}
-                          <Badge variant={cochran.p_value < 0.05 ? "success" : "warning"}>
-                            {cochran.significancia}
-                          </Badge>
-                        </p>
-                      </div>
-                      <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
-                        <p className="text-sm font-medium flex items-center gap-2">
-                          <Lightbulb className="h-4 w-4 text-amber-500" />
-                          Interpretacion
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          La prueba de Cochran Q evalua si <strong>todos los modelos tienen el mismo
-                          rendimiento</strong> de forma simultanea. Si el valor p es &lt; 0.05,
-                          se rechaza la hipotesis nula y concluimos que al menos un modelo
-                          es diferente. En ese caso, el post-hoc de McNemar con correccion Holm
-                          identifica que pares especificos tienen diferencias.
-                        </p>
-                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Modelo 1</TableHead>
+                            <TableHead>Modelo 2</TableHead>
+                            <TableHead>Valor p original</TableHead>
+                            <TableHead>Valor p ajustado (Holm)</TableHead>
+                            <TableHead>Significativo</TableHead>
+                            <TableHead>Modelo favorecido</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {mcnemar.map((row, i) => (
+                            <TableRow key={i}>
+                              <TableCell>{row.modelo1}</TableCell>
+                              <TableCell>{row.modelo2}</TableCell>
+                              <TableCell className="font-mono">{formatPValue(row.pRaw)}</TableCell>
+                              <TableCell className="font-mono">{formatPValue(row.pHolm)}</TableCell>
+                              <TableCell>
+                                {row.significativo ? (
+                                  <Badge variant="success">Si</Badge>
+                                ) : (
+                                  <Badge variant="secondary">No</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {row.favorecido === "Empate" ? (
+                                  <span className="flex items-center gap-1 text-muted-foreground">
+                                    <Minus className="h-3 w-3" /> Empate
+                                  </span>
+                                ) : (
+                                  <Badge variant={row.favorecido === row.modelo1 ? "success" : "warning"}>
+                                    {row.favorecido}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <p className="text-xs text-muted-foreground mt-4">
+                        La conclusion se basa en el valor p ajustado por Holm
+                        (p_holm), no en el valor p original. "Favorecido" se
+                        determina por la discordancia b vs c en la tabla de
+                        McNemar.
+                      </p>
                     </>
                   )}
                 </CardContent>
               </Card>
+
+              {/* Effect Size (already shown in comparison tab if available, but also relevant here) */}
+              {effectSize.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-cyan-600" />
+                      Tamano del Efecto
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Modelo 1</TableHead>
+                          <TableHead>Modelo 2</TableHead>
+                          <TableHead>Diff Accuracy</TableHead>
+                          <TableHead>Diff F1-macro</TableHead>
+                          <TableHead>Diff MCC</TableHead>
+                          <TableHead>Odds Ratio</TableHead>
+                          <TableHead>Favorecido</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {effectSize.map((e, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{e.modelo1}</TableCell>
+                            <TableCell>{e.modelo2}</TableCell>
+                            <TableCell>{formatPct(e.diffAccuracy)}</TableCell>
+                            <TableCell>{formatPct(e.diffF1Macro)}</TableCell>
+                            <TableCell className="font-mono">{formatDecimal(e.diffMcc)}</TableCell>
+                            <TableCell className="font-mono">{formatDecimal(e.oddsRatio, 4)}</TableCell>
+                            <TableCell>
+                              <Badge variant={e.favorecido === e.modelo1 ? "success" : e.favorecido === "Empate" ? "secondary" : "warning"}>
+                                {e.favorecido}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                        Interpretacion
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        El tamano del efecto complementa las pruebas de hipotesis.
+                        Una diferencia grande en MCC sugiere una mejora practica
+                        relevante, incluso si la significancia estadistica es
+                        marginal.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </>
           )}
         </TabsContent>

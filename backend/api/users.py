@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.security import get_current_user, TokenData, hash_password
 from backend.schemas.auth import UserResponse, UserUpdate
+from backend.schemas import UserCreate
 from backend.database.database import get_db, UserModel
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
@@ -34,6 +35,33 @@ def list_users(
         )
         for u in users
     ]
+
+
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user(
+    data: UserCreate,
+    admin: TokenData = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    existing = db.query(UserModel).filter(UserModel.username == data.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="El nombre de usuario ya existe")
+    user = UserModel(
+        username=data.username,
+        name=data.name,
+        password_hash=hash_password(data.password),
+        role=data.role,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        name=user.name,
+        role=user.role,
+        active=bool(user.active),
+    )
 
 
 @router.get("/{user_id}", response_model=UserResponse)

@@ -46,11 +46,13 @@ def _check_alembic_revision():
 
 def _run_alembic_upgrade():
     """Run alembic upgrade head."""
-    from alembic.config import CommandLine as AlembicCommandLine
-    alembic_cfg = str(PROJECT_ROOT / "alembic.ini")
+    from alembic.config import Config as AlembicConfig, CommandLine as AlembicCommandLine
+    alembic_cfg = AlembicConfig(str(PROJECT_ROOT / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
     cmd = AlembicCommandLine()
     cmd.parser.prog = "alembic"
-    cmd.run_cmd(AlembicConfig(alembic_cfg), ["upgrade", "head"])
+    cmd.run_cmd(alembic_cfg, ["upgrade", "head"])
 
 
 @asynccontextmanager
