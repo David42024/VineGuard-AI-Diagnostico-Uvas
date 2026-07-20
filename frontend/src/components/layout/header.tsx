@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuthStore } from "@/store/auth-store";
 import { useThemeStore } from "@/store/theme-store";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ export function Header() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { sidebarCollapsed, setSidebarCollapsed, language, setLanguage } = useThemeStore();
+  const t = useTranslation();
 
   const title = Object.entries(pageTitles).find(([path]) =>
     pathname.startsWith(path)

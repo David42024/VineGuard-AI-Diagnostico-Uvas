@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth-store";
 import { useThemeStore } from "@/store/theme-store";
 import { useTheme } from "next-themes";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n";
 import { logout as authLogout } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import {
@@ -66,6 +66,7 @@ export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, language, setLanguage } =
     useThemeStore();
   const { theme, setTheme } = useTheme();
+  const t = useTranslation();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);

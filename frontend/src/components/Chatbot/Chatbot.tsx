@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useThemeStore } from "@/store/theme-store";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n";
 import { chatbotApi, type ChatMessage } from "@/lib/api";
 import { Mic, Send, X, Bot, User, Sparkles, Loader2, Volume2, VolumeX } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -24,6 +24,7 @@ export const Chatbot = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { language } = useThemeStore();
+  const t = useTranslation();
   const recognitionRef = useRef<any>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
