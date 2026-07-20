@@ -36,7 +36,10 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = "development"
-
+    # Chatbot (Groq — LLM gratuito, ver https://console.groq.com/keys)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    
     @property
     def cors_origins(self) -> list[str]:
         origins = list(self.CORS_ORIGINS)

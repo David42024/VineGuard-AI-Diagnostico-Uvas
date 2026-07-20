@@ -1,8 +1,39 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
+import httpx
+
+from backend.core.config import settings
 
 router = APIRouter(prefix="/api/v1/chatbot", tags=["chatbot"])
+
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+SYSTEM_PROMPT_ES = (
+    "Eres el asistente virtual de VineGuard AI, una aplicación que diagnostica "
+    "enfermedades en hojas de vid (Podredumbre Negra, Esca, Tizón de la Hoja) "
+    "usando modelos de inteligencia artificial (SVM, Random Forest, KNN e "
+    "híbridos con redes neuronales). Ayudas a los usuarios a usar la app "
+    "(subir una imagen en 'Nuevo Diagnóstico', elegir el modo de análisis, "
+    "descargar reportes en PDF, Word o Excel desde 'Reportes') y a entender "
+    "sus resultados. Responde siempre en español, de forma breve, clara y "
+    "cordial (máximo 4-5 líneas salvo que te pidan más detalle). Aclara, solo "
+    "cuando sea relevante, que el diagnóstico es una ayuda de IA y no "
+    "reemplaza la evaluación de un ingeniero agrónomo o especialista "
+    "fitosanitario."
+)
+
+SYSTEM_PROMPT_EN = (
+    "You are the virtual assistant for VineGuard AI, an app that diagnoses "
+    "grapevine leaf diseases (Black Rot, Esca, Leaf Blight) using machine "
+    "learning models (SVM, Random Forest, KNN, and neural-network hybrids). "
+    "You help users navigate the app (uploading an image in 'New Diagnosis', "
+    "choosing the analysis mode, downloading PDF/Word/Excel reports from "
+    "'Reports') and understand their results. Always answer in English, "
+    "briefly, clearly and warmly (max 4-5 lines unless more detail is asked "
+    "for). Mention, only when relevant, that the AI diagnosis is a support "
+    "tool and does not replace a professional agronomist's evaluation."
+)
 
 
 class ChatMessage(BaseModel):
@@ -17,6 +48,37 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+
+
+async def _call_groq(messages: List[ChatMessage], language: str) -> Optional[str]:
+    """Llama al LLM de Groq (gratuito). Devuelve None si no hay API key o falla."""
+    if not settings.GROQ_API_KEY:
+        return None
+
+    system_prompt = SYSTEM_PROMPT_ES if language == "es" else SYSTEM_PROMPT_EN
+    payload = {
+        "model": settings.GROQ_MODEL,
+        "messages": (
+            [{"role": "system", "content": system_prompt}]
+            + [{"role": m.role, "content": m.content} for m in messages]
+        ),
+        "temperature": 0.4,
+        "max_tokens": 350,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                GROQ_API_URL,
+                headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception:
+        # Cualquier falla (sin internet, key inválida, rate limit) → usar respaldo
+        return None
 
 
 def generate_response(messages: List[ChatMessage], language: str) -> str:
@@ -159,12 +221,20 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
+async def chat(request: ChatRequest):
     """
-    Endpoint para interactuar con el chatbot de VineGuard AI (respuesta instantánea).
+    Endpoint para interactuar con el chatbot de VineGuard AI.
+    Usa un LLM real (Groq) cuando hay API key configurada; si no la hay,
+    o la llamada falla por cualquier motivo, usa el sistema de reglas
+    local como respaldo (nunca deja al usuario sin respuesta).
     """
     try:
         language = request.language if request.language in ["es", "en"] else "es"
+
+        llm_response = await _call_groq(request.messages, language)
+        if llm_response:
+            return ChatResponse(response=llm_response)
+
         response_text = generate_response(request.messages, language)
         return ChatResponse(response=response_text)
     except Exception as e:
