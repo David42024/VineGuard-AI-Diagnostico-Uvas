@@ -72,10 +72,7 @@ class ChatResponse(BaseModel):
 
 async def _call_groq(messages: List[ChatMessage], language: str) -> Optional[str]:
     """Llama al LLM de Groq (gratuito). Devuelve None si no hay API key o falla."""
-    import traceback
-    print("[DEBUG] _call_groq called")
     if not settings.GROQ_API_KEY:
-        print("[DEBUG] No GROQ_API_KEY")
         return None
 
     if language == "es":
@@ -94,8 +91,6 @@ async def _call_groq(messages: List[ChatMessage], language: str) -> Optional[str
         "max_tokens": 350,
     }
 
-    print(f"[DEBUG] Payload: {payload}")
-
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
@@ -103,15 +98,11 @@ async def _call_groq(messages: List[ChatMessage], language: str) -> Optional[str
                 headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
                 json=payload,
             )
-            print(f"[DEBUG] Response status: {response.status_code}")
-            print(f"[DEBUG] Response text: {response.text}")
             response.raise_for_status()
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
-    except Exception as e:
+    except Exception:
         # Cualquier fallo (sin internet, key inválida, rate limit) → usar respaldo
-        print(f"[DEBUG] Error in _call_groq: {e}")
-        traceback.print_exc()
         return None
 
 
@@ -325,20 +316,14 @@ async def chat(request: ChatRequest):
     o la llamada falla por cualquier motivo, usa el sistema de reglas
     local como respaldo (nunca deja al usuario sin respuesta).
     """
-    print(f"[DEBUG] chat endpoint called with request: {request}")
     try:
         language = request.language if request.language in ["es", "en", "pt"] else "es"
 
         llm_response = await _call_groq(request.messages, language)
         if llm_response:
-            print(f"[DEBUG] Using LLM response: {llm_response}")
             return ChatResponse(response=llm_response)
 
         response_text = generate_response(request.messages, language)
-        print(f"[DEBUG] Using fallback response: {response_text}")
         return ChatResponse(response=response_text)
     except Exception as e:
-        import traceback
-        print(f"[DEBUG] Error in chat endpoint: {e}")
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error en el chatbot: {str(e)}")
