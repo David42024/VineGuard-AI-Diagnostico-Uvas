@@ -35,6 +35,19 @@ SYSTEM_PROMPT_EN = (
     "tool and does not replace a professional agronomist's evaluation."
 )
 
+SYSTEM_PROMPT_PT = (
+    "Você é o assistente virtual do VineGuard AI, um aplicativo que diagnostica "
+    "doenças em folhas de videira (Podridão Negra, Esca, Queimadura das Folhas) "
+    "usando modelos de inteligência artificial (SVM, Random Forest, KNN e "
+    "híbridos com redes neurais). Ajuda os usuários a usar o app "
+    "(carregar uma imagem em 'Novo Diagnóstico', escolher o modo de análise, "
+    "baixar relatórios em PDF, Word ou Excel em 'Relatórios') e a entender "
+    "seus resultados. Responda sempre em português, de forma breve, clara e "
+    "cordial (máximo 4-5 linhas, a menos que peçam mais detalhes). Aclare, "
+    "apenas quando for relevante, que o diagnóstico é uma ajuda de IA e não "
+    "substitui a avaliação de um engenheiro agrônomo ou especialista fitossanitário."
+)
+
 
 class ChatMessage(BaseModel):
     role: str  # "user" o "assistant"
@@ -55,7 +68,12 @@ async def _call_groq(messages: List[ChatMessage], language: str) -> Optional[str
     if not settings.GROQ_API_KEY:
         return None
 
-    system_prompt = SYSTEM_PROMPT_ES if language == "es" else SYSTEM_PROMPT_EN
+    if language == "es":
+        system_prompt = SYSTEM_PROMPT_ES
+    elif language == "en":
+        system_prompt = SYSTEM_PROMPT_EN
+    else:
+        system_prompt = SYSTEM_PROMPT_PT
     payload = {
         "model": settings.GROQ_MODEL,
         "messages": (
@@ -77,7 +95,7 @@ async def _call_groq(messages: List[ChatMessage], language: str) -> Optional[str
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
     except Exception:
-        # Cualquier falla (sin internet, key inválida, rate limit) → usar respaldo
+        # Cualquier fallo (sin internet, key inválida, rate limit) → usar respaldo
         return None
 
 
@@ -88,8 +106,10 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
     if not messages:
         if language == "es":
             return "¡Hola! Soy VineGuard AI, tu asistente virtual especializado en el diagnóstico de enfermedades de las uvas. ¿En qué puedo ayudarte hoy?"
-        else:
+        elif language == "en":
             return "Hello! I'm VineGuard AI, your virtual assistant specialized in grape disease diagnosis. How can I help you today?"
+        else:
+            return "Olá! Sou o VineGuard AI, seu assistente virtual especializado no diagnóstico de doenças da videira. Em que posso ajudar você hoje?"
 
     last_message = messages[-1].content.lower()
 
@@ -103,7 +123,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         
         # Preguntas sobre cómo diagnosticar / analizar / evaluar
         elif any(keyword in last_message for keyword in [
-            "diagnóstico", "diagnosis", "diagnosticar", "analizar", "analizo", "analizar",
+            "diagnóstico", "diagnosis", "diagnosticar", "analizar", "analizo",
             "evaluo", "evaluar", "saber si", "cómo sé", "mi hoja tiene", "tiene enfermedad",
             "detectar", "reconocer", "qué tiene", "qué pasa con", "como veo", "cómo veo",
             "como se si", "cómo se si", "esta enferma", "está enferma", "enferma", "lo analizo",
@@ -157,7 +177,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
                     "- Cómo generar reportes\n"
                     "- Precisión de las predicciones\n\n"
                     "¿Tienes alguna duda específica?")
-    else:
+    elif language == "en":
         # Saludos
         if any(greeting in last_message for greeting in [
             "hola", "hello", "hi", "good morning", "good afternoon", "good evening",
@@ -179,7 +199,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
             "how accurate", "how reliable", "trustworthy", "are they accurate",
             "are they reliable"
         ]):
-            return ("VineGuard AI predictions are very accurate, but it's always important to:\n"
+            return ("VineGuard AI predictions are very accurate, but it's always important:\n"
                     "- 📸 Use clear, well-lit photos\n"
                     "- 🧑‍🌭 Consult a specialist (agronomist or phytosanitary expert) to confirm important diagnoses\n\n"
                     "Remember this is a support tool, it doesn't replace professional judgment!")
@@ -218,6 +238,67 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
                     "- How to generate reports\n"
                     "- Prediction accuracy\n\n"
                     "Do you have any specific questions?")
+    else:  # Portuguese
+        # Saudações
+        if any(greeting in last_message for greeting in [
+            "olá", "oi", "bom dia", "boa tarde", "boa noite", "como você está", "tudo bem", "hello", "hi"
+        ]):
+            return "Olá! Em que posso ajudar você com o diagnóstico de doenças da videira?"
+        
+        # Perguntas sobre como diagnosticar / analisar / avaliar
+        elif any(keyword in last_message for keyword in [
+            "diagnóstico", "diagnosis", "diagnosticar", "analisar", "analizo",
+            "avaliar", "saber se", "como sei", "minha folha tem", "tem doença",
+            "detectar", "reconhecer", "o que tem", "o que há de errado", "como vejo",
+            "como sei se", "está doente", "doente"
+        ]):
+            return "Para fazer um diagnóstico, vá para a seção 'Novo Diagnóstico' no aplicativo, envie uma foto clara de uma folha ou cacho de uva e clique em 'Analisar folha'. A IA analisará a imagem e dará um resultado com a previsão da doença (se houver) e o nível de risco."
+        
+        # Perguntas sobre precisão das previsões
+        elif any(keyword in last_message for keyword in [
+            "previsões são", "previsão é", "precisa", "preciso", "exato", "fiável",
+            "confiável", "quão preciso", "quão exato", "quão fiável", "quão confiável",
+            "são exatas", "são precisas", "são fiáveis", "são confiáveis"
+        ]):
+            return ("As previsões do VineGuard AI são muito precisas, mas é sempre importante:\n"
+                    "- 📸 Usar fotos claras e bem iluminadas\n"
+                    "- 🧑‍🌭 Consultar um especialista (engenheiro agrônomo ou fitossanitário) para confirmar diagnósticos importantes\n\n"
+                    "Lembre-se que esta é uma ferramenta de apoio, não substitui o julgamento profissional!")
+        
+        # Perguntas sobre doenças
+        elif any(keyword in last_message for keyword in [
+            "doença", "disease", "doenças", "diseases", "quais doenças",
+            "você detecta", "podem detectar", "detectam", "quais você detecta"
+        ]):
+            return "O VineGuard AI pode detectar várias doenças comuns nas uvas, incluindo: Podridão Negra (Black Rot), Esca, Queimadura das Folhas (Leaf Blight), Míldio, Oídio e Botrytis."
+        
+        # Perguntas sobre relatórios
+        elif any(keyword in last_message for keyword in [
+            "relatório", "report", "relatórios", "reports", "baixar relatório",
+            "gerar relatório", "como faço para baixar", "como faço para gerar"
+        ]):
+            return "Você pode gerar e baixar relatórios detalhados nos formatos Word (.docx), PDF e Excel (.xlsx) na seção 'Relatórios' do aplicativo."
+        
+        # Perguntas sobre o que perguntar / ajuda geral
+        elif any(keyword in last_message for keyword in [
+            "o que posso perguntar", "o que você pode fazer", "ajuda", "help", "como funciona",
+            "para que serve", "o que você faz"
+        ]):
+            return ("Você pode me perguntar sobre:\n"
+                    "- 📸 Como diagnosticar doenças nas suas folhas de uva\n"
+                    "- 🦠 Quais doenças podemos detectar\n"
+                    "- 📄 Como gerar e baixar relatórios\n"
+                    "- 💡 Qualquer dúvida sobre como usar o aplicativo\n\n"
+                    "Por onde você quer começar?")
+        
+        # Perguntas genéricas
+        else:
+            return ("Obrigado por sua pergunta! Lembre-se que posso ajudar você com:\n"
+                    "- Como diagnosticar doenças nas uvas\n"
+                    "- Quais doenças detectamos\n"
+                    "- Como gerar relatórios\n"
+                    "- Precisão das previsões\n\n"
+                    "Você tem alguma dúvida específica?")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -229,7 +310,7 @@ async def chat(request: ChatRequest):
     local como respaldo (nunca deja al usuario sin respuesta).
     """
     try:
-        language = request.language if request.language in ["es", "en"] else "es"
+        language = request.language if request.language in ["es", "en", "pt"] else "es"
 
         llm_response = await _call_groq(request.messages, language)
         if llm_response:

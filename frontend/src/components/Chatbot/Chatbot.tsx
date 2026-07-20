@@ -30,7 +30,9 @@ export const Chatbot = () => {
     role: "assistant",
     content: language === "es" 
       ? "¡Hola! Soy VineGuard AI, tu asistente virtual especializado en el diagnóstico de enfermedades de las uvas. ¿En qué puedo ayudarte hoy?"
-      : "Hello! I'm VineGuard AI, your virtual assistant specialized in grape disease diagnosis. How can I help you today?"
+      : language === "en"
+      ? "Hello! I'm VineGuard AI, your virtual assistant specialized in grape disease diagnosis. How can I help you today?"
+      : "Olá! Sou o VineGuard AI, seu assistente virtual especializado no diagnóstico de doenças da videira. Em que posso ajudar você hoje?"
   };
 
   // Scroll automático al último mensaje
@@ -52,7 +54,7 @@ export const Chatbot = () => {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = language === "es" ? "es-ES" : "en-US";
+      recognitionRef.current.lang = language === "es" ? "es-ES" : language === "en" ? "en-US" : "pt-BR";
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
@@ -155,7 +157,7 @@ export const Chatbot = () => {
                 <h3 className="text-xl font-bold">{t("chatbot.title")}</h3>
                 <p className="text-xs opacity-80 flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-300 rounded-full animate-pulse" />
-                  {language === "es" ? "En línea" : "Online"}
+                  {language === "es" ? "En línea" : language === "en" ? "Online" : "Online"}
                 </p>
               </div>
             </div>

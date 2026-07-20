@@ -48,9 +48,21 @@
   "common.theme.light": "Modo claro",
   "common.theme.dark": "Modo escuro",
   "common.logout": "Sair",
+  "common.language": "Idioma",
+  "common.language.es": "Español",
+  "common.language.en": "English",
+  "common.language.pt": "Português",
   "disease.black_rot": "Podridão Negra",
   "disease.esca": "Esca",
   "disease.healthy": "Saudável",
   "disease.leaf_blight": "Queimadura das Folhas",
-  "disclaimer": "Este resultado é uma estimativa gerada por inteligência artificial e não substitui a avaliação de um engenheiro agrônomo ou especialista fitossanitário."
+  "disclaimer": "Este resultado é uma estimativa gerada por inteligência artificial e não substitui a avaliação de um engenheiro agrônomo ou especialista fitossanitário.",
+  "chatbot.title": "Assistente VineGuard",
+  "chatbot.placeholder": "Digite sua pergunta...",
+  "chatbot.send": "Enviar",
+  "chatbot.voice.start": "Falar",
+  "chatbot.voice.stop": "Parar",
+  "chatbot.voice.listening": "Ouvindo...",
+  "chatbot.voice.notSupported": "Seu navegador não suporta reconhecimento de voz",
+  "chatbot.error": "Erro ao se comunicar com o assistente"
 }
