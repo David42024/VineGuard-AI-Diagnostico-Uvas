@@ -42,6 +42,13 @@ export const Chatbot = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Limpieza: detener la voz al desmontar el componente
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+    };
+  }, []);
+
   // Cuando se abre el chatbot por primera vez, agregar el mensaje de bienvenida
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -208,7 +215,10 @@ export const Chatbot = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  stopSpeaking();
+                  setIsOpen(false);
+                }}
                 className="text-white hover:bg-white/20 rounded-full transition-all"
               >
                 <X size={24} />
