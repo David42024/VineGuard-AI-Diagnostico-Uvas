@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useThemeStore } from "@/store/theme-store";
 import { t } from "@/i18n";
 import { chatbotApi, type ChatMessage } from "@/lib/api";
-import { Mic, Send, X, Bot, User, Sparkles, Loader2 } from "lucide-react";
+import { Mic, Send, X, Bot, User, Sparkles, Loader2, Volume2, VolumeX } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -21,9 +21,11 @@ export const Chatbot = () => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { language } = useThemeStore();
   const recognitionRef = useRef<any>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Mensaje de bienvenida
   const welcomeMessage: ChatMessage = {
@@ -95,6 +97,8 @@ export const Chatbot = () => {
         content: response.response,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      // Hablar automáticamente la respuesta
+      speak(assistantMessage.content);
     } catch (error) {
       console.error("Error en el chatbot:", error);
       const errorMessage: ChatMessage = {
@@ -104,6 +108,34 @@ export const Chatbot = () => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const speak = (text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+
+    // Cancelar cualquier habla anterior
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language === "es" ? "es-ES" : language === "en" ? "en-US" : "pt-BR";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
     }
   };
 
@@ -161,14 +193,27 @@ export const Chatbot = () => {
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsOpen(false)}
-              className="text-white hover:bg-white/20 rounded-full transition-all"
-            >
-              <X size={24} />
-            </Button>
+            <div className="flex items-center gap-2">
+              {isSpeaking && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={stopSpeaking}
+                  className="text-white hover:bg-white/20 rounded-full transition-all"
+                  title={language === "es" ? "Detener habla" : language === "en" ? "Stop speaking" : "Parar de falar"}
+                >
+                  <VolumeX size={20} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOpen(false)}
+                className="text-white hover:bg-white/20 rounded-full transition-all"
+              >
+                <X size={24} />
+              </Button>
+            </div>
           </div>
 
           {/* Messages - FANCY */}
@@ -197,7 +242,19 @@ export const Chatbot = () => {
                       : "bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-bl-sm border border-gray-200 dark:border-gray-600"
                   )}
                 >
-                  <p className="text-sm leading-relaxed">{msg.content}</p>
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm leading-relaxed flex-1">{msg.content}</p>
+                    {msg.role === "assistant" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => speak(msg.content)}
+                        className="text-gray-500 hover:text-green-600 dark:text-gray-400 h-6 w-6 p-0"
+                      >
+                        <Volume2 size={16} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
