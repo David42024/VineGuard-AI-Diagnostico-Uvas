@@ -27,6 +27,7 @@ import { FileText, Download, Search, RefreshCw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import api, { ReportItem, DiagnosisListItem } from "@/lib/api";
+import { useTranslation } from "@/i18n";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -35,6 +36,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function ReportsPage() {
+  const t = useTranslation();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [diagnoses, setDiagnoses] = useState<DiagnosisListItem[]>([]);
   const [search, setSearch] = useState("");
@@ -50,9 +52,7 @@ export default function ReportsPage() {
       const res = await api.get<{ reports: ReportItem[] }>("/reports");
       setReports(res.data.reports);
     } catch (err) {
-      setError(
-        "No se pudieron cargar los reportes. Verifica que el backend esté corriendo."
-      );
+      setError(t("reports.error"));
     } finally {
       setLoading(false);
     }
@@ -76,17 +76,17 @@ export default function ReportsPage() {
 
   const handleGenerate = async () => {
     if (!selectedDiagnosisId) {
-      toast.error("Selecciona un diagnóstico primero");
+      toast.error(t("reports.toastSelectDiagnosis"));
       return;
     }
     setGenerating(true);
     try {
       await api.post(`/reports/diagnosis/${selectedDiagnosisId}`);
-      toast.success("Reporte generado exitosamente");
+      toast.success(t("reports.toastSuccess"));
       setSelectedDiagnosisId("");
       loadReports();
     } catch (err) {
-      toast.error("No se pudo generar el reporte");
+      toast.error(t("reports.toastError"));
     } finally {
       setGenerating(false);
     }
@@ -104,37 +104,37 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Reportes</h2>
+        <h2 className="text-3xl font-bold tracking-tight">{t("reports.title")}</h2>
         <p className="text-muted-foreground">
-          Visualiza y descarga reportes generados automáticamente
+          {t("reports.subtitle")}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Generar nuevo reporte</CardTitle>
+          <CardTitle className="text-lg">{t("reports.generateNew")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
-            <label className="text-sm font-medium">Diagnóstico</label>
+            <label className="text-sm font-medium">{t("reports.diagnosisLabel")}</label>
             <Select
               value={selectedDiagnosisId}
               onValueChange={setSelectedDiagnosisId}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona un diagnóstico..." />
+                <SelectValue placeholder={t("reports.selectDiagnosis")} />
               </SelectTrigger>
               <SelectContent>
                 {diagnoses.map((d) => (
                   <SelectItem key={d.id} value={String(d.id)}>
-                    #{d.id} — {d.result} ({d.filename ?? "sin nombre"})
+                    #{d.id} — {d.result} ({d.filename ?? t("reports.noFilename")})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <Button onClick={handleGenerate} disabled={generating}>
-            {generating ? "Generando..." : "Generar reporte"}
+            {generating ? t("reports.generating") : t("reports.generateBtn")}
           </Button>
         </CardContent>
       </Card>
@@ -143,7 +143,7 @@ export default function ReportsPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar reportes..."
+            placeholder={t("reports.searchPlaceholder")}
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -156,7 +156,7 @@ export default function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Reportes Disponibles</CardTitle>
+          <CardTitle className="text-lg">{t("reports.available")}</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -169,17 +169,17 @@ export default function ReportsPage() {
             <ErrorState message={error} onRetry={loadReports} />
           ) : filtered.length === 0 ? (
             <EmptyState
-              title="Sin reportes"
-              description="Todavía no se ha generado ningún reporte. Genera uno desde un diagnóstico existente arriba."
+              title={t("reports.noReportsTitle")}
+              description={t("reports.noReportsDesc")}
             />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Archivo</TableHead>
-                  <TableHead>Tamaño</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Acciones</TableHead>
+                  <TableHead>{t("reports.columnFile")}</TableHead>
+                  <TableHead>{t("reports.columnSize")}</TableHead>
+                  <TableHead>{t("reports.columnDate")}</TableHead>
+                  <TableHead>{t("reports.columnActions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

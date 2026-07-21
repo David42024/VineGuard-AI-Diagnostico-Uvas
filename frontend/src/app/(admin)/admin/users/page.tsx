@@ -45,6 +45,7 @@ import {
 import { ErrorState } from "@/components/feedback/error-state";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { useTranslation } from "@/i18n";
 
 interface UserRow {
   id: number;
@@ -55,6 +56,7 @@ interface UserRow {
 }
 
 export default function UsersPage() {
+  const t = useTranslation();
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +75,7 @@ export default function UsersPage() {
         active: u.active,
       })));
     } catch {
-      setError("Error al cargar usuarios");
+      setError(t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -96,14 +98,14 @@ export default function UsersPage() {
         username: newUserUsername,
         password: newUserPassword,
       });
-      toast.success("Usuario creado exitosamente");
+      toast.success(t("users.toastCreateSuccess"));
       setShowNewUser(false);
       setNewUserName("");
       setNewUserUsername("");
       setNewUserPassword("");
       fetchData();
     } catch {
-      toast.error("Error al crear usuario");
+      toast.error(t("users.toastCreateError"));
     }
   };
 
@@ -124,11 +126,11 @@ export default function UsersPage() {
         role: editUserRole,
         active: editUserActive,
       });
-      toast.success("Usuario actualizado exitosamente");
+      toast.success(t("users.toastEditSuccess"));
       setShowEditUser(false);
       fetchData();
     } catch {
-      toast.error("Error al actualizar usuario");
+      toast.error(t("users.toastEditError"));
     }
   };
 
@@ -140,11 +142,11 @@ export default function UsersPage() {
     if (!deleteUser) return;
     try {
       await api.delete(`/users/${deleteUser.id}`);
-      toast.success("Usuario eliminado exitosamente");
+      toast.success(t("users.toastDeleteSuccess"));
       setShowDeleteUser(false);
       fetchData();
     } catch {
-      toast.error("Error al eliminar usuario");
+      toast.error(t("users.toastDeleteError"));
     }
   };
 
@@ -152,10 +154,10 @@ export default function UsersPage() {
   const handleToggleActive = async (user: UserRow) => {
     try {
       await api.patch(`/users/${user.id}`, { active: !user.active });
-      toast.success(user.active ? "Usuario desactivado" : "Usuario activado");
+      toast.success(user.active ? t("users.toastDeactivate") : t("users.toastActivate"));
       fetchData();
     } catch {
-      toast.error("Error al actualizar usuario");
+      toast.error(t("users.toastEditError"));
     }
   };
 
@@ -172,43 +174,43 @@ export default function UsersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">
-            Gestión de Usuarios
+            {t("users.title")}
           </h2>
           <p className="text-muted-foreground">
-            Administra los usuarios registrados en la plataforma
+            {t("users.subtitle")}
           </p>
         </div>
         <Dialog open={showNewUser} onOpenChange={setShowNewUser}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
-              Nuevo Usuario
+              {t("users.newUser")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Nuevo Usuario</DialogTitle>
+              <DialogTitle>{t("users.createUserTitle")}</DialogTitle>
               <DialogDescription>
-                Crea un nuevo usuario en el sistema
+                {t("users.createUserDesc")}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Nombre</label>
-                <Input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder="Nombre completo" />
+                <label className="text-sm font-medium">{t("users.name")}</label>
+                <Input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder={t("users.namePlaceholder")} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Usuario</label>
-                <Input value={newUserUsername} onChange={(e) => setNewUserUsername(e.target.value)} placeholder="nombre.usuario" />
+                <label className="text-sm font-medium">{t("users.username")}</label>
+                <Input value={newUserUsername} onChange={(e) => setNewUserUsername(e.target.value)} placeholder={t("users.usernamePlaceholder")} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Contraseña</label>
+                <label className="text-sm font-medium">{t("users.password")}</label>
                 <Input type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} placeholder="••••••••" />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNewUser(false)}>Cancelar</Button>
-              <Button onClick={handleCreateUser} disabled={!newUserName || !newUserUsername || !newUserPassword}>Crear</Button>
+              <Button variant="outline" onClick={() => setShowNewUser(false)}>{t("common.cancel")}</Button>
+              <Button onClick={handleCreateUser} disabled={!newUserName || !newUserUsername || !newUserPassword}>{t("users.createBtn")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -221,7 +223,7 @@ export default function UsersPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar usuarios..."
+            placeholder={t("users.searchPlaceholder")}
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -231,17 +233,17 @@ export default function UsersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Usuarios Registrados</CardTitle>
+          <CardTitle className="text-lg">{t("users.registered")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead>{t("users.columnUser")}</TableHead>
+                <TableHead>{t("users.columnName")}</TableHead>
+                <TableHead>{t("users.columnRole")}</TableHead>
+                <TableHead>{t("users.columnStatus")}</TableHead>
+                <TableHead>{t("users.columnActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -271,19 +273,19 @@ export default function UsersPage() {
                       ) : (
                         <UserIcon className="h-3 w-3" />
                       )}
-                      {user.role === "admin" ? "Admin" : "Cliente"}
+                      {user.role === "admin" ? t("users.roleAdmin") : t("users.roleClient")}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     {user.active ? (
                       <Badge variant="success" className="gap-1">
                         <CheckCircle2 className="h-3 w-3" />
-                        Activo
+                        {t("users.active")}
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="gap-1">
                         <XCircle className="h-3 w-3" />
-                        Inactivo
+                        {t("users.inactive")}
                       </Badge>
                     )}
                   </TableCell>
@@ -319,7 +321,7 @@ export default function UsersPage() {
                         size="sm"
                         onClick={() => handleToggleActive(user)}
                       >
-                        {user.active ? "Desactivar" : "Activar"}
+                        {user.active ? t("users.btnDeactivate") : t("users.btnActivate")}
                       </Button>
                     </div>
                   </TableCell>
@@ -342,31 +344,31 @@ export default function UsersPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogTitle>{t("users.editUserTitle")}</DialogTitle>
             <DialogDescription>
-              Actualiza los datos del usuario
+              {t("users.editUserDesc")}
             </DialogDescription>
           </DialogHeader>
           {editUser && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Nombre</label>
+                <label className="text-sm font-medium">{t("users.name")}</label>
                 <Input
                   value={editUserName}
                   onChange={(e) => setEditUserName(e.target.value)}
-                  placeholder="Nombre completo"
+                  placeholder={t("users.namePlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Usuario</label>
+                <label className="text-sm font-medium">{t("users.username")}</label>
                 <Input
                   value={editUserUsername}
                   onChange={(e) => setEditUserUsername(e.target.value)}
-                  placeholder="nombre.usuario"
+                  placeholder={t("users.usernamePlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Rol</label>
+                <label className="text-sm font-medium">{t("users.role")}</label>
                 <Select
                   value={editUserRole}
                   onValueChange={(v) => setEditUserRole(v as "admin" | "client")}
@@ -375,13 +377,13 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="client">Cliente</SelectItem>
+                    <SelectItem value="admin">{t("users.roleAdmin")}</SelectItem>
+                    <SelectItem value="client">{t("users.roleClient")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Estado</label>
+                <label className="text-sm font-medium">{t("users.status")}</label>
                 <Select
                   value={editUserActive ? "active" : "inactive"}
                   onValueChange={(v) => setEditUserActive(v === "active")}
@@ -390,16 +392,16 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Activo</SelectItem>
-                    <SelectItem value="inactive">Inactivo</SelectItem>
+                    <SelectItem value="active">{t("users.statusActive")}</SelectItem>
+                    <SelectItem value="inactive">{t("users.statusInactive")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditUser(false)}>Cancelar</Button>
-            <Button onClick={handleEditUser} disabled={!editUserName || !editUserUsername}>Guardar</Button>
+            <Button variant="outline" onClick={() => setShowEditUser(false)}>{t("common.cancel")}</Button>
+            <Button onClick={handleEditUser} disabled={!editUserName || !editUserUsername}>{t("users.saveBtn")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -416,9 +418,9 @@ export default function UsersPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar Usuario</DialogTitle>
+            <DialogTitle>{t("users.deleteUserTitle")}</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.
+              {t("users.deleteUserDesc")}
             </DialogDescription>
           </DialogHeader>
           {deleteUser && (
@@ -432,8 +434,8 @@ export default function UsersPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteUser(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>Eliminar</Button>
+            <Button variant="outline" onClick={() => setShowDeleteUser(false)}>{t("common.cancel")}</Button>
+            <Button variant="destructive" onClick={handleDeleteUser}>{t("common.delete")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
