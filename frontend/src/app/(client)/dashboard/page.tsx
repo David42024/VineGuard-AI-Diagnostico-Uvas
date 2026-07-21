@@ -18,28 +18,12 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { useAuthStore } from "@/store/auth-store";
+import { useTranslation } from "@/i18n";
 import api from "@/lib/api";
-
-const tips = [
-  {
-    icon: Camera,
-    title: "Buena iluminación",
-    description: "Fotografía la hoja con luz natural y evitar sombras.",
-  },
-  {
-    icon: Lightbulb,
-    title: "Hoja completa",
-    description: "Asegúrate de capturar la hoja completa y centrada.",
-  },
-  {
-    icon: Activity,
-    title: "Fondo uniforme",
-    description: "Usa un fondo claro y sin elementos distractores.",
-  },
-];
 
 export default function ClientDashboard() {
   const { user } = useAuthStore();
+  const t = useTranslation();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
     totalDiagnostics: number;
@@ -48,6 +32,24 @@ export default function ClientDashboard() {
     lastResult: string;
   } | null>(null);
 
+  const tips = [
+    {
+      icon: Camera,
+      title: t("dashboard.tip1Title"),
+      description: t("dashboard.tip1Desc"),
+    },
+    {
+      icon: Lightbulb,
+      title: t("dashboard.tip2Title"),
+      description: t("dashboard.tip2Desc"),
+    },
+    {
+      icon: Activity,
+      title: t("dashboard.tip3Title"),
+      description: t("dashboard.tip3Desc"),
+    },
+  ];
+
   useEffect(() => {
     api.get("/statistics/my-summary").then((res) => {
       const d = res.data;
@@ -55,7 +57,7 @@ export default function ClientDashboard() {
         totalDiagnostics: d.total_diagnostics ?? 0,
         healthyPct: d.healthy_pct ?? 0,
         diseasedCount: Math.round((d.diseased_pct ?? 0) * (d.total_diagnostics ?? 0) / 100),
-        lastResult: d.last_diagnosis?.result?.replace(/_/g, " ") || (d.today_diagnostics > 0 ? "Hoy" : "—"),
+        lastResult: d.last_diagnosis?.result?.replace(/_/g, " ") || (d.today_diagnostics > 0 ? t("dashboard.today") : "—"),
       });
     }).catch(() => {
       setStats({ totalDiagnostics: 0, healthyPct: 0, diseasedCount: 0, lastResult: "—" });
@@ -66,10 +68,10 @@ export default function ClientDashboard() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Bienvenido, {user?.name || "Usuario"}
+          {t("dashboard.welcome").replace("{name}", user?.name || t("dashboard.unknown"))}
         </h2>
         <p className="text-muted-foreground">
-          Realiza diagnósticos de hojas de vid y consulta tu historial
+          {t("dashboard.subtitle")}
         </p>
       </div>
 
@@ -80,22 +82,22 @@ export default function ClientDashboard() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
-            title="Diagnósticos Totales"
+            title={t("dashboard.totalDiagnostics")}
             value={stats?.totalDiagnostics ?? 0}
             icon={Activity}
           />
           <MetricCard
-            title="Hojas Sanas"
+            title={t("dashboard.healthyLeaves")}
             value={stats != null ? `${stats.healthyPct}%` : "0%"}
             icon={Leaf}
           />
           <MetricCard
-            title="Enfermedades Detectadas"
+            title={t("dashboard.diseasesDetected")}
             value={stats?.diseasedCount ?? 0}
             icon={Bug}
           />
           <MetricCard
-            title="Último Resultado"
+            title={t("dashboard.lastResult")}
             value={stats?.lastResult ?? "—"}
             icon={Clock}
           />
@@ -107,9 +109,9 @@ export default function ClientDashboard() {
           <CardContent className="p-8 flex flex-col items-center text-center space-y-4">
             <Search className="h-12 w-12" />
             <div>
-              <h3 className="text-2xl font-bold">Nuevo Diagnóstico</h3>
+              <h3 className="text-2xl font-bold">{t("dashboard.newDiagnosis")}</h3>
               <p className="text-primary-foreground/80 mt-1">
-                Sube una foto de una hoja de vid para analizarla
+                {t("dashboard.newDiagnosisDesc")}
               </p>
             </div>
             <Link href="/dashboard/diagnosis">
@@ -118,7 +120,7 @@ export default function ClientDashboard() {
                 size="lg"
                 className="mt-2"
               >
-                Comenzar
+                {t("dashboard.start")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -129,7 +131,7 @@ export default function ClientDashboard() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Camera className="h-5 w-5 text-primary" />
-              Consejos para fotos
+              {t("dashboard.photoTips")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -153,10 +155,10 @@ export default function ClientDashboard() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Diagnósticos Recientes</CardTitle>
+            <CardTitle className="text-lg">{t("dashboard.recentDiagnostics")}</CardTitle>
             <Link href="/dashboard/history">
               <Button variant="ghost" size="sm">
-                Ver todos <ArrowRight className="ml-1 h-4 w-4" />
+                {t("dashboard.viewAll")} <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
           </div>
@@ -170,20 +172,21 @@ export default function ClientDashboard() {
 }
 
 function RecentDiagnostics() {
+  const t = useTranslation();
   const [items, setItems] = useState<Array<{ filename: string; result: string; date: string; confidence: string }>>([]);
   useEffect(() => {
     api.get("/diagnoses?limit=3").then((res) => {
       const list = (res.data?.items || []).map((d: { filename?: string; result: string; created_at?: string; confidence?: number }) => ({
-        filename: d.filename || "desconocido",
+        filename: d.filename || t("dashboard.unknown"),
         result: d.result?.replace(/_/g, " ") || "—",
-        date: d.created_at ? new Date(d.created_at).toLocaleDateString("es-ES") : "—",
+        date: d.created_at ? new Date(d.created_at).toLocaleDateString() : "—",
         confidence: d.confidence != null ? `${(d.confidence * 100).toFixed(1)}%` : "—",
       }));
       setItems(list);
     }).catch(() => setItems([]));
   }, []);
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground text-center py-4">No hay diagnósticos recientes</p>;
+    return <p className="text-sm text-muted-foreground text-center py-4">{t("dashboard.noRecentDiagnostics")}</p>;
   }
   return (
     <div className="space-y-4">

@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn, formatConfidence } from "@/lib/utils";
 import type { PredictionDetail, ModelRanking } from "@/types/api";
 import { formatClassName, MODEL_NAMES } from "@/lib/constants";
+import { useTranslation } from "@/i18n";
 
 interface ComparisonViewProps {
   predictions: PredictionDetail[];
@@ -16,6 +17,7 @@ interface ComparisonViewProps {
 }
 
 export function ComparisonView({ predictions, consensusClass, ranking }: ComparisonViewProps) {
+  const t = useTranslation();
   if (!predictions || predictions.length === 0) return null;
 
   const successful = predictions.filter((p) => p.status === "success");
@@ -69,8 +71,8 @@ export function ComparisonView({ predictions, consensusClass, ranking }: Compari
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          Comparación de Modelos
-          <Badge variant="secondary">{predictions.length} modelos</Badge>
+          {t("comparison.title")}
+          <Badge variant="secondary">{t("comparison.modelsCount").replace("{count}", String(predictions.length))}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -79,26 +81,26 @@ export function ComparisonView({ predictions, consensusClass, ranking }: Compari
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             <span className="font-semibold">
-              Resultado general: {formatClassName(majorityClass)}
+              {t("comparison.overallResult")} {formatClassName(majorityClass)}
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div>
-              <p className="text-muted-foreground text-xs">Modelos coincidentes</p>
+              <p className="text-muted-foreground text-xs">{t("comparison.matchingModels")}</p>
               <p className="font-medium">
                 {agreeingCount} de {successful.length}
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Mayor confianza</p>
+              <p className="text-muted-foreground text-xs">{t("comparison.highestConfidence")}</p>
               <p className="font-medium">{formatConfidence(maxConf)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Menor confianza</p>
+              <p className="text-muted-foreground text-xs">{t("comparison.lowestConfidence")}</p>
               <p className="font-medium">{formatConfidence(minConf)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Diferencia máxima</p>
+              <p className="text-muted-foreground text-xs">{t("comparison.maxDifference")}</p>
               <p className="font-medium">{formatConfidence(maxDiff)}</p>
             </div>
           </div>
@@ -176,7 +178,7 @@ export function ComparisonView({ predictions, consensusClass, ranking }: Compari
                   <>
                     <div className="flex items-center justify-between text-sm mb-2">
                       <span>
-                        <span className="text-muted-foreground">Predicción: </span>
+                        <span className="text-muted-foreground">{t("comparison.prediction")} </span>
                         <span className="font-semibold">
                           {formatClassName(pred.predicted_class)}
                         </span>
@@ -190,15 +192,15 @@ export function ComparisonView({ predictions, consensusClass, ranking }: Compari
                         )}
                       >
                         {agreesWithMajority
-                          ? "Coincide con la clase mayoritaria"
-                          : "Difiere de la clase mayoritaria"}
+                          ? t("comparison.agreesWithMajority")
+                          : t("comparison.differsFromMajority")}
                       </span>
                     </div>
 
                     {pred.confidence != null && (
                       <div className="space-y-1 mb-2">
                         <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Confianza</span>
+                          <span>{t("comparison.confidence")}</span>
                           <span>{formatConfidence(pred.confidence)}</span>
                         </div>
                         <Progress value={pred.confidence * 100} className="h-1.5" />
@@ -208,7 +210,7 @@ export function ComparisonView({ predictions, consensusClass, ranking }: Compari
                     {pred.probabilities && pred.probabilities.length > 0 && (
                       <div className="mt-2 space-y-1">
                         <p className="text-xs text-muted-foreground mb-1">
-                          Distribución de probabilidades
+                          {t("comparison.probabilityDistribution")}
                         </p>
                         {["Black_rot", "Esca", "Healthy", "Leaf_blight"].map(
                           (cls, idx) => (
@@ -234,7 +236,7 @@ export function ComparisonView({ predictions, consensusClass, ranking }: Compari
                 ) : (
                   <div className="flex items-start gap-2 text-sm text-destructive">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{pred.error || "Error en la predicción"}</span>
+                    <span>{pred.error || t("comparison.error")}</span>
                   </div>
                 )}
               </div>

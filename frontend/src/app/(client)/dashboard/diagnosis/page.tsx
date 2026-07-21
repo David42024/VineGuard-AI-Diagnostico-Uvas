@@ -22,6 +22,7 @@ import {
   FileWarning,
   AlertTriangle,
 } from "lucide-react";
+import { useTranslation } from "@/i18n";
 import api from "@/lib/api";
 import type { DiagnosisResponse, ModelRanking } from "@/types/api";
 
@@ -34,28 +35,8 @@ interface ModeOption {
   description: string;
 }
 
-const MODES: ModeOption[] = [
-  {
-    key: "consensus",
-    icon: GitBranch,
-    label: "Consenso",
-    description: "Combina resultados de múltiples modelos",
-  },
-  {
-    key: "best_model",
-    icon: Star,
-    label: "Mejor Modelo",
-    description: "Usa el modelo con mejor rendimiento",
-  },
-  {
-    key: "compare_all",
-    icon: LayoutDashboard,
-    label: "Comparar Todos",
-    description: "Ejecuta todos los modelos y compara sus predicciones",
-  },
-];
-
 export default function DiagnosisPage() {
+  const t = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [modelKey, setModelKey] = useState<ModelKey>("consensus");
@@ -64,6 +45,27 @@ export default function DiagnosisPage() {
   const [result, setResult] = useState<DiagnosisResponse | null>(null);
   const [error, setError] = useState("");
   const [modelRanking, setModelRanking] = useState<ModelRanking[]>([]);
+
+  const MODES: ModeOption[] = [
+    {
+      key: "consensus",
+      icon: GitBranch,
+      label: t("diagnosis.mode.consensus"),
+      description: t("diagnosis.mode.consensusDesc"),
+    },
+    {
+      key: "best_model",
+      icon: Star,
+      label: t("diagnosis.mode.best"),
+      description: t("diagnosis.mode.bestDesc"),
+    },
+    {
+      key: "compare_all",
+      icon: LayoutDashboard,
+      label: t("diagnosis.mode.compareAll"),
+      description: t("diagnosis.mode.compareAllDesc"),
+    },
+  ];
 
   useEffect(() => {
     api.get<ModelRanking[]>("/models/ranking")
@@ -114,10 +116,10 @@ export default function DiagnosisPage() {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setResult(response.data);
-      toast.success("Diagnóstico completado exitosamente");
+      toast.success(t("diagnosis.success"));
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : "Error al procesar la imagen. Intente nuevamente.";
+        err instanceof Error ? err.message : t("diagnosis.uploadError");
       setError(msg);
       toast.error(msg);
     } finally {
@@ -159,9 +161,9 @@ const handleDownload = async () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
 
-      toast.success("Reporte descargado");
+      toast.success(t("diagnosis.downloadSuccess"));
     } catch {
-      toast.error("No se pudo generar el reporte. Intenta de nuevo.");
+      toast.error(t("diagnosis.downloadError"));
     } finally {
       setDownloading(false);
     }
@@ -171,11 +173,10 @@ const handleDownload = async () => {
     <div className="space-y-6 max-w-4xl">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Nuevo Diagnóstico
+          {t("diagnosis.title")}
         </h2>
         <p className="text-muted-foreground">
-          Sube una imagen de hoja de vid para analizarla con nuestros modelos de
-          IA
+          {t("diagnosis.upload")}
         </p>
       </div>
 
@@ -183,7 +184,7 @@ const handleDownload = async () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">1. Subir Imagen</CardTitle>
+              <CardTitle className="text-lg">{t("diagnosis.step1")}</CardTitle>
             </CardHeader>
             <CardContent>
               <UploadZone
@@ -197,7 +198,7 @@ const handleDownload = async () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">2. Seleccionar Modo</CardTitle>
+              <CardTitle className="text-lg">{t("diagnosis.step2")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3">
@@ -230,7 +231,7 @@ const handleDownload = async () => {
                         </p>
                       </div>
                       {selected && (
-                        <Badge variant="success">Seleccionado</Badge>
+                        <Badge variant="success">{t("diagnosis.selected")}</Badge>
                       )}
                     </button>
                   );
@@ -248,12 +249,12 @@ const handleDownload = async () => {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Analizando...
+                {t("diagnosis.analyzing")}
               </>
             ) : (
               <>
                 <Search className="mr-2 h-5 w-5" />
-                Analizar hoja
+                {t("diagnosis.analyze")}
               </>
             )}
           </Button>
@@ -262,7 +263,7 @@ const handleDownload = async () => {
             <div className="space-y-2">
               <Progress value={progress} />
               <p className="text-center text-sm text-muted-foreground">
-                Procesando imagen... {progress}%
+                {t("diagnosis.processing")} {progress}%
               </p>
             </div>
           )}
@@ -294,11 +295,7 @@ const handleDownload = async () => {
                 <CardContent className="p-4">
                   <div className="flex items-start gap-2 rounded-md bg-muted p-3 text-xs text-muted-foreground">
                     <FileWarning className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>
-                      Este resultado es una estimación generada por inteligencia
-                      artificial y no reemplaza la evaluación de un ingeniero
-                      agrónomo o especialista fitosanitario.
-                    </span>
+                    <span>{t("disclaimer")}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -309,9 +306,9 @@ const handleDownload = async () => {
                   onChange={(e) => setReportFormat(e.target.value as ReportFormat)}
                   className="rounded-md border px-3 py-2 text-sm"
                 >
-                  <option value="docx">Word (.docx)</option>
-                  <option value="pdf">PDF</option>
-                  <option value="xlsx">Excel (.xlsx)</option>
+                  <option value="docx">{t("diagnosis.formatWord")}</option>
+                  <option value="pdf">{t("diagnosis.formatPdf")}</option>
+                  <option value="xlsx">{t("diagnosis.formatExcel")}</option>
                 </select>
 
                 <Button
@@ -321,11 +318,11 @@ const handleDownload = async () => {
                   disabled={downloading}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  {downloading ? "Generando..." : "Descargar Reporte"}
+                  {downloading ? t("diagnosis.generating") : t("diagnosis.downloadReport")}
                 </Button>
                 <Button variant="outline" className="flex-1" onClick={handleRemove}>
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  Nuevo Análisis
+                  {t("diagnosis.newAnalysis")}
                 </Button>
               </div>
             </>

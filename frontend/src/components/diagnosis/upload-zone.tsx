@@ -4,6 +4,7 @@ import { useState, useRef, DragEvent } from "react";
 import { Upload, X, Image as ImageIcon, FileWarning } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/i18n";
 
 interface UploadZoneProps {
   onFileSelect: (file: File) => void;
@@ -18,6 +19,7 @@ export function UploadZone({
   preview,
   onRemove,
 }: UploadZoneProps) {
+  const t = useTranslation();
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,11 +27,11 @@ export function UploadZone({
   const validateFile = (file: File): boolean => {
     const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
     if (!validTypes.includes(file.type)) {
-      setError("Formato no soportado. Use JPG, PNG o WebP.");
+      setError(t("upload.formatError"));
       return false;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError("La imagen no debe superar los 10MB.");
+      setError(t("upload.sizeError"));
       return false;
     }
     setError("");
@@ -104,10 +106,10 @@ export function UploadZone({
               <Upload className="h-6 w-6 text-primary" />
             </div>
             <p className="mb-1 text-sm font-medium">
-              Arrastra una imagen aquí o haz clic para seleccionar
+              {t("upload.dragAndDrop")}
             </p>
             <p className="text-xs text-muted-foreground">
-              JPG, PNG o WebP. Máximo 10MB.
+              {t("upload.formatHint")}
             </p>
           </>
         )}

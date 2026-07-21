@@ -8,12 +8,14 @@ import { Separator } from "@/components/ui/separator";
 import { cn, formatConfidence, formatDate } from "@/lib/utils";
 import type { DiagnosisResponse } from "@/types/api";
 import { formatClassName, MODE_LABELS, MODEL_NAMES } from "@/lib/constants";
+import { useTranslation } from "@/i18n";
 
 interface ResultCardProps {
   diagnosis: DiagnosisResponse;
 }
 
 export function ResultCard({ diagnosis }: ResultCardProps) {
+  const t = useTranslation();
   const {
     prediction,
     model,
@@ -43,19 +45,19 @@ export function ResultCard({ diagnosis }: ResultCardProps) {
             {prediction.display_name || formatClassName(prediction.class_code)}
           </CardTitle>
           <Badge variant={isHealthy ? "success" : "destructive"}>
-            {isHealthy ? "Sana" : "Enfermedad detectada"}
+            {isHealthy ? t("result.healthy") : t("result.diseased")}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md bg-muted/50 p-3 space-y-1 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Método de diagnóstico:</span>
+            <span className="text-muted-foreground">{t("result.diagnosisMethod")}</span>
             <span className="font-medium">{modeDisplay}</span>
           </div>
           {mode === "best_model" && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Modelo utilizado:</span>
+              <span className="text-muted-foreground">{t("result.modelUsed")}</span>
               <span className="font-medium">{model.name}</span>
             </div>
           )}
@@ -63,13 +65,13 @@ export function ResultCard({ diagnosis }: ResultCardProps) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-muted-foreground">Clase</p>
+            <p className="text-sm text-muted-foreground">{t("result.class")}</p>
             <p className="text-sm font-medium">
               {formatClassName(prediction.class_code)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Nivel de riesgo</p>
+            <p className="text-sm text-muted-foreground">{t("result.risk")}</p>
             <span
               className={cn(
                 "text-sm font-semibold",
@@ -90,7 +92,7 @@ export function ResultCard({ diagnosis }: ResultCardProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
-              {mode === "consensus" ? "Confianza del consenso" : "Confianza"}
+              {mode === "consensus" ? t("result.consensusConfidence") : t("result.confidence")}
             </span>
             <span className="text-sm font-bold">
               {formatConfidence(prediction.confidence)}
@@ -110,7 +112,7 @@ export function ResultCard({ diagnosis }: ResultCardProps) {
             <Separator />
             <div className="space-y-3">
               <p className="text-sm font-medium">
-                Distribución de Probabilidades
+                {t("result.probabilityDistribution")}
               </p>
               {Object.entries(probabilities).map(([cls, prob]) => (
                 <div key={cls} className="space-y-1">

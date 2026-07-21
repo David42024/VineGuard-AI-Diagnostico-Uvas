@@ -3,6 +3,7 @@
 import { Activity, Bug, Leaf, CalendarDays } from "lucide-react";
 import { MetricCard } from "./metric-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/i18n";
 
 interface StatsData {
   totalDiagnostics: number;
@@ -18,6 +19,8 @@ interface StatsGridProps {
 }
 
 export function StatsGrid({ data, loading }: StatsGridProps) {
+  const t = useTranslation();
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -31,23 +34,23 @@ export function StatsGrid({ data, loading }: StatsGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
-        title="Total Diagnósticos"
+        title={t("dashboard.totalDiagnostics")}
         value={data?.totalDiagnostics ?? 0}
         icon={Activity}
       />
       <MetricCard
-        title="Hoy"
+        title={t("dashboard.today")}
         value={data?.todayDiagnostics ?? 0}
         icon={CalendarDays}
-        description="Diagnósticos realizados hoy"
+        description={t("dashboard.todayDiagnoses")}
       />
       <MetricCard
-        title="Hojas Sanas"
+        title={t("dashboard.healthyLeaves")}
         value={`${data?.healthyPercentage ?? 0}%`}
         icon={Leaf}
       />
       <MetricCard
-        title="Hojas Enfermas"
+        title={t("dashboard.diseasedLeaves")}
         value={`${data?.diseasedPercentage ?? 0}%`}
         icon={Bug}
       />

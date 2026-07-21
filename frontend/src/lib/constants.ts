@@ -6,10 +6,10 @@ export const CLASS_NAMES: Record<string, string> = {
 };
 
 export const CLASS_DISPLAY_NAMES: Record<string, string> = {
-  Black_rot: "Podredumbre Negra",
-  Esca: "Esca (Sarampión Negro)",
-  Healthy: "Hoja Sana",
-  Leaf_blight: "Tizón de la Hoja",
+  Black_rot: "Black Rot",
+  Esca: "Esca (Black Measles)",
+  Healthy: "Healthy Leaf",
+  Leaf_blight: "Leaf Blight",
 };
 
 export const CLASS_COLORS: Record<string, string> = {
@@ -28,23 +28,23 @@ export const MODEL_NAMES: Record<string, string> = {
   M3: "M3 - KNN",
   H1: "H1 - CNN + SVM",
   H2: "H2 - MobileNetV2 + RF",
-  all: "Todos los Modelos",
-  consensus: "Consenso de 5 modelos",
-  best_model: "Mejor Modelo",
+  all: "All Models",
+  consensus: "Consensus of 5 models",
+  best_model: "Best Model",
 };
 
 export const MODE_LABELS: Record<string, string> = {
-  consensus: "Consenso de 5 modelos",
-  best_model: "Mejor Modelo",
-  compare_all: "Todos los Modelos",
-  single: "Modelo individual",
+  consensus: "Consensus of 5 models",
+  best_model: "Best Model",
+  compare_all: "All Models",
+  single: "Single model",
 };
 
 export const MODE_DESCRIPTIONS: Record<string, string> = {
-  consensus: "Combina resultados de múltiples modelos por votación mayoritaria",
-  best_model: "Usa el modelo con mejor rendimiento según la evaluación comparativa",
-  compare_all: "Ejecuta todos los modelos y compara sus predicciones detalladas",
-  single: "Predicción con un modelo específico",
+  consensus: "Combines results from multiple models by majority voting",
+  best_model: "Uses the best performing model according to benchmark evaluation",
+  compare_all: "Runs all models and compares their detailed predictions",
+  single: "Prediction with a specific model",
 };
 
 export function formatClassName(classCode: string): string {

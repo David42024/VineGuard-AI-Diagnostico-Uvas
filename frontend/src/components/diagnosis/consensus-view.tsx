@@ -8,12 +8,14 @@ import { Separator } from "@/components/ui/separator";
 import { formatConfidence } from "@/lib/utils";
 import type { ConsensusInfo } from "@/types/api";
 import { formatClassName, MODEL_NAMES } from "@/lib/constants";
+import { useTranslation } from "@/i18n";
 
 interface ConsensusViewProps {
   consensus: ConsensusInfo;
 }
 
 export function ConsensusView({ consensus }: ConsensusViewProps) {
+  const t = useTranslation();
   const {
     agreement_level,
     predicted_class,
@@ -38,17 +40,17 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
 
   const agreementLabel =
     agreement_level === "high"
-      ? "Alto"
+      ? t("consensus.high")
       : agreement_level === "medium"
-        ? "Medio"
-        : "Bajo";
+        ? t("consensus.medium")
+        : t("consensus.low");
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Users className="h-5 w-5 text-primary" />
-          Resultado por consenso
+          {t("consensus.title")}
           <Badge
             variant={
               fullAgreement
@@ -58,14 +60,14 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
                   : "warning"
             }
           >
-            {agreementPercent.toFixed(0)}% de acuerdo
+            {agreementPercent.toFixed(0)}{t("consensus.agreement")}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md bg-muted/50 p-3 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Clase final</span>
+            <span className="text-muted-foreground">{t("consensus.finalClass")}</span>
             <span className="font-semibold">
               {predicted_class
                 ? formatClassName(predicted_class)
@@ -74,7 +76,7 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">
-              Confianza del consenso
+              {t("consensus.confidence")}
             </span>
             <span className="font-semibold">
               {confidence != null ? formatConfidence(confidence) : "N/A"}
@@ -91,7 +93,7 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Nivel de acuerdo</span>
+            <span className="text-muted-foreground">{t("consensus.agreementLevel")}</span>
             <span className="font-semibold">{agreementLabel}</span>
           </div>
           <Progress
@@ -100,14 +102,15 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
           />
           <p className="text-sm text-muted-foreground">
             {fullAgreement
-              ? `${agreeing_models ?? 0} de ${total_models ?? 0} modelos coinciden`
-              : `${agreeing_models ?? 0} de ${total_models ?? 0} modelos coinciden en ${formatClassName(predicted_class || "")}`
+              ? t("consensus.modelsAgree").replace("{agreeing}", String(agreeing_models ?? 0)).replace("{total}", String(total_models ?? 0))
+              : t("consensus.modelsAgreeWithClass").replace("{agreeing}", String(agreeing_models ?? 0)).replace("{total}", String(total_models ?? 0)).replace("{class}", formatClassName(predicted_class || ""))
             }
             {disagreeCount > 0 && (
               <span className="text-yellow-600">
                 {" "}
-                ({disagreeCount} modelo{disagreeCount > 1 ? "s" : ""} discrepa
-                {disagreeCount === 1 ? "" : "n"})
+                {disagreeCount === 1
+                  ? t("consensus.modelsDisagree").replace("{count}", String(disagreeCount))
+                  : t("consensus.modelsDisagreePlural").replace("{count}", String(disagreeCount))}
               </span>
             )}
           </p>
@@ -118,7 +121,7 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
             <Separator />
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">
-                Votos por clase
+                {t("consensus.votesByClass")}
               </p>
               {Object.entries(vote_distribution)
                 .sort(([, a], [, b]) => b - a)
@@ -158,7 +161,7 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
 
         {tie_breaker && (
           <div className="rounded-md bg-yellow-50 dark:bg-yellow-950/20 p-3 text-sm text-yellow-800 dark:text-yellow-200">
-            <p className="font-medium mb-1">Criterio de desempate</p>
+            <p className="font-medium mb-1">{t("consensus.tieBreaker")}</p>
             <p className="text-xs">{tie_breaker}</p>
           </div>
         )}
@@ -167,8 +170,7 @@ export function ConsensusView({ consensus }: ConsensusViewProps) {
           <div className="flex items-start gap-2 rounded-md bg-yellow-50 p-3 text-sm text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
             <MinusCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              El nivel de acuerdo entre modelos es bajo. Se recomienda realizar
-              un análisis adicional o consultar a un especialista.
+              {t("consensus.lowAgreement")}
             </span>
           </div>
         )}
