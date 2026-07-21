@@ -25,6 +25,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Search,
   UserPlus,
   Shield,
@@ -32,6 +39,8 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { ErrorState } from "@/components/feedback/error-state";
 import { toast } from "sonner";
@@ -74,6 +83,7 @@ export default function UsersPage() {
     fetchData();
   }, []);
 
+  // Create user state
   const [showNewUser, setShowNewUser] = useState(false);
   const [newUserName, setNewUserName] = useState("");
   const [newUserUsername, setNewUserUsername] = useState("");
@@ -97,6 +107,48 @@ export default function UsersPage() {
     }
   };
 
+  // Edit user state
+  const [showEditUser, setShowEditUser] = useState(false);
+  const [editUser, setEditUser] = useState<UserRow | null>(null);
+  const [editUserName, setEditUserName] = useState("");
+  const [editUserUsername, setEditUserUsername] = useState("");
+  const [editUserRole, setEditUserRole] = useState<"admin" | "client">("client");
+  const [editUserActive, setEditUserActive] = useState(true);
+
+  const handleEditUser = async () => {
+    if (!editUser) return;
+    try {
+      await api.patch(`/users/${editUser.id}`, {
+        name: editUserName,
+        username: editUserUsername,
+        role: editUserRole,
+        active: editUserActive,
+      });
+      toast.success("Usuario actualizado exitosamente");
+      setShowEditUser(false);
+      fetchData();
+    } catch {
+      toast.error("Error al actualizar usuario");
+    }
+  };
+
+  // Delete user state
+  const [showDeleteUser, setShowDeleteUser] = useState(false);
+  const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
+
+  const handleDeleteUser = async () => {
+    if (!deleteUser) return;
+    try {
+      await api.delete(`/users/${deleteUser.id}`);
+      toast.success("Usuario eliminado exitosamente");
+      setShowDeleteUser(false);
+      fetchData();
+    } catch {
+      toast.error("Error al eliminar usuario");
+    }
+  };
+
+  // Toggle active
   const handleToggleActive = async (user: UserRow) => {
     try {
       await api.patch(`/users/${user.id}`, { active: !user.active });
@@ -237,13 +289,34 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => { /* Edit is left as a future enhancement */ }}>
-                        Editar
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditUser(user);
+                          setEditUserName(user.name);
+                          setEditUserUsername(user.username);
+                          setEditUserRole(user.role);
+                          setEditUserActive(user.active);
+                          setShowEditUser(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-destructive"
+                        onClick={() => {
+                          setDeleteUser(user);
+                          setShowDeleteUser(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleToggleActive(user)}
                       >
                         {user.active ? "Desactivar" : "Activar"}
@@ -256,6 +329,114 @@ export default function UsersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit User Dialog */}
+      <Dialog
+        open={showEditUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowEditUser(false);
+            setEditUser(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogDescription>
+              Actualiza los datos del usuario
+            </DialogDescription>
+          </DialogHeader>
+          {editUser && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nombre</label>
+                <Input
+                  value={editUserName}
+                  onChange={(e) => setEditUserName(e.target.value)}
+                  placeholder="Nombre completo"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Usuario</label>
+                <Input
+                  value={editUserUsername}
+                  onChange={(e) => setEditUserUsername(e.target.value)}
+                  placeholder="nombre.usuario"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Rol</label>
+                <Select
+                  value={editUserRole}
+                  onValueChange={(v) => setEditUserRole(v as "admin" | "client")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="client">Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Estado</label>
+                <Select
+                  value={editUserActive ? "active" : "inactive"}
+                  onValueChange={(v) => setEditUserActive(v === "active")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Activo</SelectItem>
+                    <SelectItem value="inactive">Inactivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditUser(false)}>Cancelar</Button>
+            <Button onClick={handleEditUser} disabled={!editUserName || !editUserUsername}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog
+        open={showDeleteUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowDeleteUser(false);
+            setDeleteUser(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Usuario</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteUser && (
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">
+                Usuario: <span className="font-medium">{deleteUser.username}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Nombre: <span className="font-medium">{deleteUser.name}</span> 
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteUser(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeleteUser}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
