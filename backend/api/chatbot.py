@@ -143,7 +143,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
             "predicciones son", "prediccion es", "precisa", "preciso", "exacta", "exacto",
             "fiable", "fiables", "confiable", "confiables", "qué tan", "qué tan preciso",
             "qué tan exacto", "qué tan fiable", "qué tan confiable", "son exactas",
-            "son precisas", "son fiables", "son confiables"
+            "son precisas", "son fiables", "son confiables", "precisión", "precisión de las predicciones"
         ]):
             return ("Las predicciones de VineGuard AI son muy precisas, pero siempre es importante:\n"
                     "- 📸 Usar fotos claras y bien iluminadas\n"
@@ -204,7 +204,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         elif any(keyword in last_message for keyword in [
             "predictions are", "prediction is", "accurate", "accurately", "reliable",
             "how accurate", "how reliable", "trustworthy", "are they accurate",
-            "are they reliable"
+            "are they reliable", "prediction accuracy", "precision"
         ]):
             return ("VineGuard AI predictions are very accurate, but it's always important:\n"
                     "- 📸 Use clear, well-lit photos\n"
@@ -265,7 +265,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         elif any(keyword in last_message for keyword in [
             "previsões são", "previsão é", "precisa", "preciso", "exato", "fiável",
             "confiável", "quão preciso", "quão exato", "quão fiável", "quão confiável",
-            "são exatas", "são precisas", "são fiáveis", "são confiáveis"
+            "são exatas", "são precisas", "são fiáveis", "são confiáveis", "precisão", "precisão das previsões"
         ]):
             return ("As previsões do VineGuard AI são muito precisas, mas é sempre importante:\n"
                     "- 📸 Usar fotos claras e bem iluminadas\n"
