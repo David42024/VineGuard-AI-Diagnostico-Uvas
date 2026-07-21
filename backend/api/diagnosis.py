@@ -144,7 +144,7 @@ def create_diagnosis(
         used_model = "consensus"
         inf_time = sum(r.get("inference_time_ms", 0) for r in consensus.get("individual_results", []))
 
-        raw_probs_list = None
+        raw_probs_list = consensus["primary_result"].get("probabilities")
 
         for r in consensus.get("individual_results", []):
             predictions_list.append(PredictionDetail(
@@ -221,7 +221,7 @@ def create_diagnosis(
         confidence = consensus["confidence"]
         used_model = "all"
         inf_time = sum(r.get("inference_time_ms", 0) for r in consensus.get("individual_results", []))
-        raw_probs_list = None
+        raw_probs_list = consensus["primary_result"].get("probabilities")
         for r in consensus.get("individual_results", []):
             predictions_list.append(PredictionDetail(
                 model_key=r["model_key"],
@@ -243,28 +243,6 @@ def create_diagnosis(
             vote_distribution=consensus.get("vote_distribution"),
             tie_breaker=consensus.get("tie_breaker"),
         )
-    elif model_key == "all":
-        load_all_models()
-        consensus = predict_consensus(pil_image)
-        if consensus["status"] == "error":
-            raise HTTPException(status_code=500, detail=consensus.get("error", "Error en predicción"))
-        result_class = consensus["predicted_class"]
-        confidence = consensus["confidence"]
-        predictions_list = []
-        for r in consensus.get("individual_results", []):
-            predictions_list.append(PredictionDetail(
-                model_key=r["model_key"],
-                model_name=r.get("model_name", r["model_key"]),
-                predicted_class=r["predicted_class"],
-                confidence=r.get("confidence"),
-                probabilities=r.get("probabilities"),
-                inference_time_ms=r.get("inference_time_ms"),
-                status=r.get("status", "success"),
-            ).model_dump())
-        used_model = "all"
-        inf_time = sum(r.get("inference_time_ms", 0) for r in consensus.get("individual_results", []))
-        raw_probs_list = None
-        consensus_out = None
     else:
         if model_key not in MODEL_KEYS:
             raise HTTPException(status_code=400, detail=f"model_key inválido: {model_key}. Valores válidos: {', '.join(MODEL_KEYS)}")
