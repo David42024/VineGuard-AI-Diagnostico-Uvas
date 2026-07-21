@@ -25,6 +25,9 @@ DISEASE_INFO = {
         "scientific_name": "Guignardia bidwellii",
         "health_status": "diseased",
         "risk_level": "high",
+        "treatment_es": "1. Podar y eliminar partes afectadas inmediatamente\n2. Aplicar fungicidas cúpricos o sistémicos (mancozeb, triazoles)\n3. Mejorar la ventilación del viñedo\n4. Evitar riego por aspersión",
+        "treatment_en": "1. Prune and remove affected parts immediately\n2. Apply copper or systemic fungicides (mancozeb, triazoles)\n3. Improve vineyard ventilation\n4. Avoid sprinkler irrigation",
+        "treatment_pt": "1. Podar e remover partes afetadas imediatamente\n2. Aplicar fungicidas cúpricos ou sistêmicos (mancozeb, triazóis)\n3. Melhorar a ventilação do vinhedo\n4. Evitar irrigação por aspersão",
     },
     "Esca": {
         "display_name_es": "Esca (Sarampión Negro)",
@@ -33,6 +36,9 @@ DISEASE_INFO = {
         "scientific_name": "Complejo fúngico vascular",
         "health_status": "diseased",
         "risk_level": "high",
+        "treatment_es": "1. Podar ramas afectadas en invierno\n2. Evitar heridas en poda y cultivo\n3. Aplicar fungicidas protectores en cortes\n4. Mejorar drenaje del suelo",
+        "treatment_en": "1. Prune affected branches in winter\n2. Avoid wounds during pruning and cultivation\n3. Apply protective fungicides on cuts\n4. Improve soil drainage",
+        "treatment_pt": "1. Podar ramos afetados no inverno\n2. Evitar feridas durante poda e cultivo\n3. Aplicar fungicidas protetores nos cortes\n4. Melhorar drenagem do solo",
     },
     "Healthy": {
         "display_name_es": "Hoja Sana",
@@ -41,6 +47,9 @@ DISEASE_INFO = {
         "scientific_name": "",
         "health_status": "healthy",
         "risk_level": "none",
+        "treatment_es": "1. Continuar monitoreo periódico del viñedo\n2. Mantener prácticas culturales adecuadas\n3. Aplicar fertilización balanceada",
+        "treatment_en": "1. Continue periodic vineyard monitoring\n2. Maintain adequate cultural practices\n3. Apply balanced fertilization",
+        "treatment_pt": "1. Continuar monitoramento periódico do vinhedo\n2. Manter práticas culturais adequadas\n3. Aplicar adubação balanceada",
     },
     "Leaf_blight": {
         "display_name_es": "Tizón de la Hoja",
@@ -49,6 +58,9 @@ DISEASE_INFO = {
         "scientific_name": "Pseudocercospora vitis",
         "health_status": "diseased",
         "risk_level": "moderate",
+        "treatment_es": "1. Eliminar hojas infectadas y restos de poda\n2. Aplicar fungicidas (cobre, mancozeb, clorotalonil)\n3. Espaciar plantas para mejor circulación\n4. Evitar mojar hojas en riego",
+        "treatment_en": "1. Remove infected leaves and pruning debris\n2. Apply fungicides (copper, mancozeb, chlorothalonil)\n3. Space plants for better circulation\n4. Avoid wetting leaves during irrigation",
+        "treatment_pt": "1. Remover folhas infectadas e restos de poda\n2. Aplicar fungicidas (cobre, mancozeb, clorotalonil)\n3. Espaçar plantas para melhor circulação\n4. Evitar molhar folhas durante irrigação",
     },
 }
 

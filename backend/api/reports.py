@@ -226,6 +226,7 @@ def _generate_docx_report(diagnosis: DiagnosticModel) -> Path:
         ("Clase Predicha", predicted_class),
         ("Confianza", _format_percentage(diagnosis.confidence)),
         ("Modelo", _safe_value(diagnosis.model_used)),
+        ("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms else "N/A"),
     ], highlighted_labels={"Clase Predicha"})
     doc.add_paragraph()
 
@@ -233,11 +234,19 @@ def _generate_docx_report(diagnosis: DiagnosticModel) -> Path:
     add_info_table(doc, [
         ("Nombre (ES)", _safe_value(disease_info.get("display_name_es"))),
         ("Nombre (EN)", _safe_value(disease_info.get("display_name_en"))),
+        ("Nombre (PT)", _safe_value(disease_info.get("display_name_pt"))),
         ("Nombre Científico", _safe_value(disease_info.get("scientific_name"))),
         ("Estado", _safe_value(disease_info.get("health_status"))),
         ("Nivel de Riesgo", risk_level.upper()),
     ], risk_label="Nivel de Riesgo", risk_fill_hex=risk_hex)
     doc.add_paragraph()
+
+    if disease_info.get("treatment_es"):
+        add_section_heading(doc, "Recomendaciones de Tratamiento")
+        for line in disease_info["treatment_es"].split("\n"):
+            p = doc.add_paragraph(line)
+            p.paragraph_format.left_indent = Inches(0.25)
+        doc.add_paragraph()
 
     add_section_heading(doc, "Distribución de Probabilidades")
     table = doc.add_table(rows=1, cols=2)
@@ -408,19 +417,28 @@ def _generate_pdf_report(diagnosis: DiagnosticModel) -> Path:
             ("Clase Predicha", predicted_class),
             ("Confianza", _format_percentage(diagnosis.confidence)),
             ("Modelo", _safe_value(diagnosis.model_used)),
+            ("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms else "N/A"),
         ], highlighted_labels={"Clase Predicha"}),
         Spacer(1, 10),
         Paragraph("Detalles de la Enfermedad", heading_style),
         info_table([
             ("Nombre (ES)", _safe_value(disease_info.get("display_name_es"))),
             ("Nombre (EN)", _safe_value(disease_info.get("display_name_en"))),
+            ("Nombre (PT)", _safe_value(disease_info.get("display_name_pt"))),
             ("Nombre Científico", _safe_value(disease_info.get("scientific_name"))),
             ("Estado", _safe_value(disease_info.get("health_status"))),
             ("Nivel de Riesgo", risk_level.upper()),
         ], risk_label="Nivel de Riesgo", risk_fill_hex=risk_hex),
         Spacer(1, 10),
-        Paragraph("Distribución de Probabilidades", heading_style),
     ]
+
+    if disease_info.get("treatment_es"):
+        story.append(Paragraph("Recomendaciones de Tratamiento", heading_style))
+        for line in disease_info["treatment_es"].split("\n"):
+            story.append(Paragraph(escape(line), body_style))
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph("Distribución de Probabilidades", heading_style))
 
     probability_data = [["Clase", "Probabilidad"]]
     if probability_items:
@@ -568,15 +586,23 @@ def _generate_excel_report(diagnosis: DiagnosticModel) -> Path:
     write_row("Clase Predicha", predicted_class, value_font=highlight_font, highlight=True)
     write_row("Confianza", _format_percentage(diagnosis.confidence))
     write_row("Modelo", _safe_value(diagnosis.model_used))
+    write_row("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms else "N/A")
     ws.append([])
 
     write_section("Detalles de la Enfermedad")
     write_row("Nombre (ES)", _safe_value(disease_info.get("display_name_es")))
     write_row("Nombre (EN)", _safe_value(disease_info.get("display_name_en")))
+    write_row("Nombre (PT)", _safe_value(disease_info.get("display_name_pt")))
     write_row("Nombre Científico", _safe_value(disease_info.get("scientific_name")))
     write_row("Estado", _safe_value(disease_info.get("health_status")))
     write_row("Nivel de Riesgo", risk_level.upper(), value_font=risk_font, value_fill=risk_fill)
     ws.append([])
+
+    if disease_info.get("treatment_es"):
+        write_section("Recomendaciones de Tratamiento")
+        for line in disease_info["treatment_es"].split("\n"):
+            write_row("", line)
+        ws.append([])
 
     write_section("Distribución de Probabilidades")
     header_row = ws.max_row + 1
