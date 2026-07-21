@@ -124,7 +124,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         # Saludos
         if any(greeting in last_message for greeting in [
             "hola", "hello", "hi", "buenos días", "buenas tardes", "buenas noches",
-            "qué tal", "cómo estás", "holi", "holis", "holaaaa", "hola ia"
+            "qué tal", "cómo estás", "holi", "holis", "holaaaa", "hola ia", "hey", "que tal"
         ]):
             return "¡Hola! ¿En qué puedo ayudarte con el diagnóstico de enfermedades de las uvas?"
         
@@ -134,7 +134,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
             "evaluo", "evaluar", "saber si", "cómo sé", "mi hoja tiene", "tiene enfermedad",
             "detectar", "reconocer", "qué tiene", "qué pasa con", "como veo", "cómo veo",
             "como se si", "cómo se si", "esta enferma", "está enferma", "enferma", "lo analizo",
-            "como lo analizo", "cómo lo analizo"
+            "como lo analizo", "cómo lo analizo", "subir foto", "subir imagen", "analizar imagen", "analizar hoja"
         ]):
             return "Para realizar un diagnóstico, ve a la sección 'Nuevo Diagnóstico' en la aplicación, sube una foto clara de una hoja o racimo de uva y haz clic en 'Analizar hoja'. La IA analizará la imagen y te dará un resultado con la predicción de la enfermedad (si la hay) y el nivel de riesgo."
         
@@ -143,7 +143,8 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
             "predicciones son", "prediccion es", "precisa", "preciso", "exacta", "exacto",
             "fiable", "fiables", "confiable", "confiables", "qué tan", "qué tan preciso",
             "qué tan exacto", "qué tan fiable", "qué tan confiable", "son exactas",
-            "son precisas", "son fiables", "son confiables", "precisión", "precisión de las predicciones"
+            "son precisas", "son fiables", "son confiables", "precisión", "precisión de las predicciones",
+            "precision", "qué tan segura", "qué tan seguro", "seguridad"
         ]):
             return ("Las predicciones de VineGuard AI son muy precisas, pero siempre es importante:\n"
                     "- 📸 Usar fotos claras y bien iluminadas\n"
@@ -153,21 +154,22 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         # Preguntas sobre enfermedades
         elif any(keyword in last_message for keyword in [
             "enfermedad", "disease", "enfermedades", "diseases", "qué enfermedades",
-            "detectas", "puedes detectar", "detectan", "qué detectas"
+            "detectas", "puedes detectar", "detectan", "qué detectas", "qué enfermedades hay",
+            "qué enfermedades puedo diagnosticar"
         ]):
             return "VineGuard AI puede detectar varias enfermedades comunes en las uvas, entre ellas: Podredumbre Negra (Black Rot), Esca, Tizón de la Hoja (Leaf Blight), Mildiu, Oídio y Botrytis."
         
         # Preguntas sobre reportes
         elif any(keyword in last_message for keyword in [
             "reporte", "report", "reportes", "reports", "descargar reporte",
-            "generar reporte", "cómo descargo", "cómo genero"
+            "generar reporte", "cómo descargo", "cómo genero", "descargar pdf", "descargar word", "descargar excel"
         ]):
             return "Puedes generar y descargar reportes detallados en formatos Word (.docx), PDF y Excel (.xlsx) desde la sección 'Reportes' de la aplicación."
         
         # Preguntas sobre qué preguntar / ayuda general
         elif any(keyword in last_message for keyword in [
             "qué te puedo preguntar", "qué puedo preguntarte", "qué puedes hacer",
-            "ayuda", "help", "cómo funciona", "para qué sirves", "qué haces"
+            "ayuda", "help", "cómo funciona", "para qué sirves", "qué haces", "cómo se usa", "usar la app"
         ]):
             return ("Puedes preguntarme sobre:\n"
                     "- 📸 Cómo diagnosticar enfermedades en tus hojas de uva\n"
@@ -188,7 +190,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         # Saludos
         if any(greeting in last_message for greeting in [
             "hola", "hello", "hi", "good morning", "good afternoon", "good evening",
-            "hey", "how are you", "what's up"
+            "hey", "how are you", "what's up", "howdy"
         ]):
             return "Hello! How can I help you with grape disease diagnosis?"
         
@@ -196,7 +198,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         elif any(keyword in last_message for keyword in [
             "diagnóstico", "diagnosis", "diagnosticar", "analyze", "how do i",
             "how to", "evaluate", "check if", "my leaf has", "has disease",
-            "detect", "recognize", "what's wrong with"
+            "detect", "recognize", "what's wrong with", "upload photo", "upload image", "analyze image", "analyze leaf"
         ]):
             return "To perform a diagnosis, go to the 'New Diagnosis' section in the app, upload a clear photo of a grape leaf or cluster, and click 'Analyze leaf'. The AI will analyze the image and give you a result with the disease prediction (if any) and risk level."
         
@@ -204,7 +206,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         elif any(keyword in last_message for keyword in [
             "predictions are", "prediction is", "accurate", "accurately", "reliable",
             "how accurate", "how reliable", "trustworthy", "are they accurate",
-            "are they reliable", "prediction accuracy", "precision"
+            "are they reliable", "prediction accuracy", "precision", "how sure", "security"
         ]):
             return ("VineGuard AI predictions are very accurate, but it's always important:\n"
                     "- 📸 Use clear, well-lit photos\n"
@@ -214,21 +216,21 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         # Preguntas sobre enfermedades
         elif any(keyword in last_message for keyword in [
             "enfermedad", "disease", "enfermedades", "diseases", "what diseases",
-            "can you detect", "do you detect"
+            "can you detect", "do you detect", "what diseases are there", "what diseases can I diagnose"
         ]):
             return "VineGuard AI can detect several common grape diseases, including: Black Rot, Esca, Leaf Blight, Downy Mildew, Powdery Mildew, and Botrytis."
         
         # Preguntas sobre reportes
         elif any(keyword in last_message for keyword in [
             "reporte", "report", "reportes", "reports", "download report",
-            "generate report", "how do i download", "how do i generate"
+            "generate report", "how do i download", "how do i generate", "download pdf", "download word", "download excel"
         ]):
             return "You can generate and download detailed reports in Word (.docx), PDF, and Excel (.xlsx) formats from the 'Reports' section of the application."
         
         # Preguntas sobre qué preguntar / ayuda general
         elif any(keyword in last_message for keyword in [
             "what can i ask you", "what can you do", "help", "how does this work",
-            "what do you do", "what is this for"
+            "what do you do", "what is this for", "how to use", "use the app"
         ]):
             return ("You can ask me about:\n"
                     "- 📸 How to diagnose diseases on your grape leaves\n"
@@ -248,7 +250,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
     else:  # Portuguese
         # Saudações
         if any(greeting in last_message for greeting in [
-            "olá", "oi", "bom dia", "boa tarde", "boa noite", "como você está", "tudo bem", "hello", "hi"
+            "olá", "oi", "bom dia", "boa tarde", "boa noite", "como você está", "tudo bem", "hello", "hi", "tchau", "ola"
         ]):
             return "Olá! Em que posso ajudar você com o diagnóstico de doenças da videira?"
         
@@ -257,7 +259,7 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
             "diagnóstico", "diagnosis", "diagnosticar", "analisar", "analizo",
             "avaliar", "saber se", "como sei", "minha folha tem", "tem doença",
             "detectar", "reconhecer", "o que tem", "o que há de errado", "como vejo",
-            "como sei se", "está doente", "doente"
+            "como sei se", "está doente", "doente", "enviar foto", "enviar imagem", "analisar imagem", "analisar folha"
         ]):
             return "Para fazer um diagnóstico, vá para a seção 'Novo Diagnóstico' no aplicativo, envie uma foto clara de uma folha ou cacho de uva e clique em 'Analisar folha'. A IA analisará a imagem e dará um resultado com a previsão da doença (se houver) e o nível de risco."
         
@@ -265,7 +267,8 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         elif any(keyword in last_message for keyword in [
             "previsões são", "previsão é", "precisa", "preciso", "exato", "fiável",
             "confiável", "quão preciso", "quão exato", "quão fiável", "quão confiável",
-            "são exatas", "são precisas", "são fiáveis", "são confiáveis", "precisão", "precisão das previsões"
+            "são exatas", "são precisas", "são fiáveis", "são confiáveis", "precisão", "precisão das previsões",
+            "quão seguro", "segurança"
         ]):
             return ("As previsões do VineGuard AI são muito precisas, mas é sempre importante:\n"
                     "- 📸 Usar fotos claras e bem iluminadas\n"
@@ -275,21 +278,21 @@ def generate_response(messages: List[ChatMessage], language: str) -> str:
         # Perguntas sobre doenças
         elif any(keyword in last_message for keyword in [
             "doença", "disease", "doenças", "diseases", "quais doenças",
-            "você detecta", "podem detectar", "detectam", "quais você detecta"
+            "você detecta", "podem detectar", "detectam", "quais você detecta", "quais doenças existem", "quais doenças posso diagnosticar"
         ]):
             return "O VineGuard AI pode detectar várias doenças comuns nas uvas, incluindo: Podridão Negra (Black Rot), Esca, Queimadura das Folhas (Leaf Blight), Míldio, Oídio e Botrytis."
         
         # Perguntas sobre relatórios
         elif any(keyword in last_message for keyword in [
             "relatório", "report", "relatórios", "reports", "baixar relatório",
-            "gerar relatório", "como faço para baixar", "como faço para gerar"
+            "gerar relatório", "como faço para baixar", "como faço para gerar", "baixar pdf", "baixar word", "baixar excel"
         ]):
             return "Você pode gerar e baixar relatórios detalhados nos formatos Word (.docx), PDF e Excel (.xlsx) na seção 'Relatórios' do aplicativo."
         
         # Perguntas sobre o que perguntar / ajuda geral
         elif any(keyword in last_message for keyword in [
             "o que posso perguntar", "o que você pode fazer", "ajuda", "help", "como funciona",
-            "para que serve", "o que você faz"
+            "para que serve", "o que você faz", "como usar", "usar o app"
         ]):
             return ("Você pode me perguntar sobre:\n"
                     "- 📸 Como diagnosticar doenças nas suas folhas de uva\n"
