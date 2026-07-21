@@ -226,7 +226,7 @@ def _generate_docx_report(diagnosis: DiagnosticModel) -> Path:
         ("Clase Predicha", predicted_class),
         ("Confianza", _format_percentage(diagnosis.confidence)),
         ("Modelo", _safe_value(diagnosis.model_used)),
-        ("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms else "N/A"),
+        ("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms is not None else "N/A"),
     ], highlighted_labels={"Clase Predicha"})
     doc.add_paragraph()
 
@@ -417,7 +417,7 @@ def _generate_pdf_report(diagnosis: DiagnosticModel) -> Path:
             ("Clase Predicha", predicted_class),
             ("Confianza", _format_percentage(diagnosis.confidence)),
             ("Modelo", _safe_value(diagnosis.model_used)),
-            ("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms else "N/A"),
+            ("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms is not None else "N/A"),
         ], highlighted_labels={"Clase Predicha"}),
         Spacer(1, 10),
         Paragraph("Detalles de la Enfermedad", heading_style),
@@ -586,7 +586,7 @@ def _generate_excel_report(diagnosis: DiagnosticModel) -> Path:
     write_row("Clase Predicha", predicted_class, value_font=highlight_font, highlight=True)
     write_row("Confianza", _format_percentage(diagnosis.confidence))
     write_row("Modelo", _safe_value(diagnosis.model_used))
-    write_row("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms else "N/A")
+    write_row("Tiempo de Inferencia", f"{_safe_value(round(diagnosis.inference_time_ms, 2))} ms" if diagnosis.inference_time_ms is not None else "N/A")
     ws.append([])
 
     write_section("Detalles de la Enfermedad")
