@@ -3,7 +3,7 @@
 import streamlit as st
 from pathlib import Path
 from datetime import datetime
-from ui.components import section_header, empty_state
+from ui.components import empty_state
 
 
 PIPELINE_STAGES = [
@@ -189,13 +189,6 @@ def _render_stage_card(stage: dict, completed: bool):
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Resumen del Pipeline", "Pipeline Summary", "Resumo do Pipeline"),
-        _t("Estado detallado de cada etapa del flujo de Machine Learning", "Detailed status of each ML flow stage", "Status detalhado de cada etapa do fluxo de Machine Learning"),
-        "🔧",
-    )
-
     any_running = any(
         v for k, v in st.session_state.items()
         if k.startswith("_running_") and v

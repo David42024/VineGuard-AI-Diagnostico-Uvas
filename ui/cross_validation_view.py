@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button
+from ui.components import empty_state, info_box, run_script_button
 
 
 CV_DIR = Path("reports/modelos/cross_validation")
@@ -15,13 +15,6 @@ def _t(es: str, en: str, pt: str) -> str:
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Validación Cruzada", "Cross-Validation", "Validação Cruzada"),
-        _t("Resultados por fold, media y desviación estándar", "Per-fold results, mean and standard deviation", "Resultados por fold, média e desvio padrão"),
-        "📐",
-    )
-
     run_script_button(
         "src/cross_validation_modelos.py",
         _t("📐 Ejecutar validación cruzada", "📐 Run cross-validation", "📐 Executar validação cruzada"),

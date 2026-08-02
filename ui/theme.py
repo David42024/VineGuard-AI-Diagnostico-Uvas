@@ -28,8 +28,8 @@ LIGHT_CSS = """
     --border-light: #E8EDEA;
 
     --text-primary: #17201B;
-    --text-secondary: #647067;
-    --text-muted: #94A39A;
+    --text-secondary: #46534C;
+    --text-muted: #7A8980;
 
     --green-primary: #166534;
     --green-secondary: #22C55E;
@@ -76,8 +76,8 @@ DARK_CSS = """
     --border-light: #1C3528;
 
     --text-primary: #F1F8F3;
-    --text-secondary: #A8B9AE;
-    --text-muted: #6B8273;
+    --text-secondary: #C2D0C7;
+    --text-muted: #8CA096;
 
     --green-primary: #4ADE80;
     --green-secondary: #22C55E;
@@ -121,12 +121,19 @@ html, body, .stApp {
 
 .main .block-container {
     max-width: 1100px;
-    padding: 1.5rem 1rem;
+    padding: 1.25rem 1rem 2rem;
 }
 
 h1, h2, h3, h4, h5, h6 {
     color: var(--text-primary) !important;
     font-weight: 600 !important;
+}
+
+/* Etiquetas de widgets con contraste correcto según el tema */
+[data-testid="stWidgetLabel"] {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
 }
 
 /* Texto secundario sólo en contextos nativos de Streamlit, no en HTML personalizado */
@@ -218,6 +225,18 @@ a { color: var(--green-primary) !important; }
 
 [data-baseweb="input"]:focus-within,
 [data-baseweb="textarea"]:focus-within {
+    border-color: var(--green-primary) !important;
+    box-shadow: 0 0 0 2px var(--green-soft) !important;
+}
+
+[data-baseweb="input"]:hover,
+[data-baseweb="textarea"]:hover,
+[data-baseweb="select"] > div:hover {
+    border-color: rgba(34, 197, 94, 0.5) !important;
+}
+
+[data-baseweb="select"]:focus-within > div,
+[data-baseweb="select"]:focus > div {
     border-color: var(--green-primary) !important;
     box-shadow: 0 0 0 2px var(--green-soft) !important;
 }
@@ -320,8 +339,24 @@ input::placeholder, textarea::placeholder {
 }
 
 /* ========== PROGRESS ========== */
-[data-testid="stProgress"] > div > div > div {
-    background: var(--gradient-hero) !important;
+/* Texto de st.progress(...) con color del tema (primer hijo del contenedor) */
+[data-testid="stProgress"] > div:first-child {
+    color: var(--text-secondary) !important;
+    font-size: 0.875rem !important;
+}
+[data-testid="stProgress"] > div:first-child p {
+    color: var(--text-secondary) !important;
+    margin: 0 0 0.25rem 0 !important;
+}
+/* Riel de la barra (track) con fondo del tema */
+[data-testid="stProgress"] > div:nth-child(2) > div > div {
+    background-color: var(--bg-surface) !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+}
+/* Relleno (fill) con degradado verde visible en ambos temas */
+[data-testid="stProgress"] > div:nth-child(2) > div > div > div {
+    background: linear-gradient(90deg, var(--green-primary), var(--green-secondary)) !important;
 }
 
 /* ========== ALERTS ========== */

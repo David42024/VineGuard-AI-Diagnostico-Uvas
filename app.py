@@ -121,29 +121,6 @@ except Exception:
 # --- Render theme ---
 render_theme()
 
-# --- Language selector (top, before login) ---
-lang = st.session_state.language
-col_lang1, col_lang2 = st.columns([3.5, 1.5])
-with col_lang2:
-    language_options = {
-        "Español": "es",
-        "English": "en",
-        "Português": "pt",
-    }
-    selected_language = st.selectbox(
-        "Language / Idioma",
-        options=list(language_options.keys()),
-        index=list(language_options.values()).index(lang),
-        key="main_language_selector",
-    )
-    new_language = language_options[selected_language]
-    if new_language != lang:
-        st.session_state.language = new_language
-        st.rerun()
-
-st.markdown("---")
-
-
 # ============================================================================
 # AUTHENTICATION GATE
 # ============================================================================
@@ -185,21 +162,21 @@ PAGES = {
         "view": dataset_eda_view,
     },
     "preprocessing": {
-        "title_es": "Preprocesamiento",
-        "title_en": "Preprocessing",
-        "title_pt": "Pré-processamento",
-        "sub_es": "Configuración y ejemplos visuales del aumento de datos",
-        "sub_en": "Configuration and visual examples of data augmentation",
-        "sub_pt": "Configuração e exemplos visuais do aumento de dados",
+        "title_es": "Preprocesamiento y Aumento",
+        "title_en": "Preprocessing & Augmentation",
+        "title_pt": "Pré-processamento e Aumento",
+        "sub_es": "Configuración y ejemplos visuales del preprocesamiento",
+        "sub_en": "Configuration and visual examples of preprocessing",
+        "sub_pt": "Configuração e exemplos visuais do pré-processamento",
         "view": preprocessing_view,
     },
     "training": {
-        "title_es": "Entrenamiento",
-        "title_en": "Training",
-        "title_pt": "Treinamento",
-        "sub_es": "Estado, métricas y artefactos de los 5 modelos",
-        "sub_en": "Status, metrics and artifacts of the 5 models",
-        "sub_pt": "Status, métricas e artefatos dos 5 modelos",
+        "title_es": "Entrenamiento de Modelos",
+        "title_en": "Model Training",
+        "title_pt": "Treinamento de Modelos",
+        "sub_es": "Estado, métricas y artefactos de los 5 modelos del sistema",
+        "sub_en": "Status, metrics and artifacts of the 5 system models",
+        "sub_pt": "Status, métricas e artefatos dos 5 modelos do sistema",
         "view": training_view,
     },
     "crossval": {
@@ -212,21 +189,21 @@ PAGES = {
         "view": cross_validation_view,
     },
     "hyperparams": {
-        "title_es": "Hiperparámetros",
-        "title_en": "Hyperparameters",
-        "title_pt": "Hiperparâmetros",
+        "title_es": "Optimización de Hiperparámetros",
+        "title_en": "Hyperparameter Optimization",
+        "title_pt": "Otimização de Hiperparâmetros",
         "sub_es": "Mejores parámetros encontrados por modelo",
         "sub_en": "Best parameters found per model",
         "sub_pt": "Melhores parâmetros encontrados por modelo",
         "view": hyperparams_view,
     },
     "stats_tests": {
-        "title_es": "Pruebas Estadísticas",
-        "title_en": "Statistical Tests",
-        "title_pt": "Testes Estatísticos",
-        "sub_es": "Validación estadística del rendimiento de los modelos",
-        "sub_en": "Statistical validation of model performance",
-        "sub_pt": "Validação estatística do desempenho dos modelos",
+        "title_es": "Validación Estadística",
+        "title_en": "Statistical Validation",
+        "title_pt": "Validação Estatística",
+        "sub_es": "Pruebas estadísticas del rendimiento de los modelos",
+        "sub_en": "Statistical tests of model performance",
+        "sub_pt": "Testes estatísticos do desempenho dos modelos",
         "view": statistical_tests_view,
     },
     "comparison": {

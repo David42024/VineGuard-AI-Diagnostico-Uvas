@@ -3,7 +3,7 @@
 import json
 import streamlit as st
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button
+from ui.components import empty_state, info_box, run_script_button
 
 JSON_PATH = Path("models/modelo_final/modelo_final.json")
 
@@ -23,14 +23,6 @@ def _fmt_metric(val) -> str:
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("⭐ Mejor Modelo", "⭐ Best Model", "⭐ Melhor Modelo"),
-        _t("Modelo seleccionado como óptimo para diagnóstico",
-          "Model selected as optimal for diagnosis",
-          "Modelo selecionado como ótimo para diagnóstico"),
-    )
-
     run_script_button(
         "src/seleccion_mejor_modelo.py",
         _t("⭐ Seleccionar mejor modelo", "⭐ Select best model", "⭐ Selecionar melhor modelo"),

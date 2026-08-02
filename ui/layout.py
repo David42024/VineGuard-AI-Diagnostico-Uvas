@@ -15,6 +15,7 @@ NAV_ITEMS = [
     {"id": "stats_tests", "label_es": "📈 Pruebas Estadísticas",      "label_en": "📈 Statistical Tests",      "label_pt": "📈 Testes Estatísticos"},
     {"id": "comparison",  "label_es": "🏆 Comparación de Modelos",    "label_en": "🏆 Model Comparison",       "label_pt": "🏆 Comparação de Modelos"},
     {"id": "best_model",  "label_es": "⭐ Mejor Modelo",              "label_en": "⭐ Best Model",             "label_pt": "⭐ Melhor Modelo"},
+    {"id": "reports",     "label_es": "📄 Reportes",                  "label_en": "📄 Reports",               "label_pt": "📄 Relatórios"},
 ]
 
 
@@ -37,11 +38,11 @@ def render_header(page_title: str, page_subtitle: str = ""):
     col1, col2 = st.columns([2.5, 1])
     with col1:
         st.markdown(f"""
-        <div style="margin-bottom: 0.5rem;">
-            <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0; color: var(--text-primary);">
+        <div style="margin-bottom: 0.25rem;">
+            <h1 style="font-size: 1.35rem; font-weight: 700; margin: 0; line-height: 1.2; color: var(--text-primary);">
                 {page_title}
             </h1>
-            {f'<p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.15rem 0 0 0;">{page_subtitle}</p>' if page_subtitle else ''}
+            {f'<p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.1rem 0 0 0;">{page_subtitle}</p>' if page_subtitle else ''}
         </div>
         """, unsafe_allow_html=True)
     with col2:
@@ -49,7 +50,7 @@ def render_header(page_title: str, page_subtitle: str = ""):
             user_avatar(name, role_label),
             unsafe_allow_html=True,
         )
-    st.markdown('<hr style="margin: 0.5rem 0 1.5rem 0;">', unsafe_allow_html=True)
+    st.markdown('<hr style="margin: 0.35rem 0 1.25rem 0;">', unsafe_allow_html=True)
 
 
 def render_sidebar():

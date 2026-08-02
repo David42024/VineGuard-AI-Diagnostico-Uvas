@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button
+from ui.components import empty_state, info_box, run_script_button
 
 STAT_DIR = Path("reports/estadistica")
 
@@ -255,15 +255,6 @@ def _render_effect_size():
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Validación Estadística", "Statistical Validation", "Validação Estatística"),
-        _t("Pruebas estadísticas del rendimiento de los modelos",
-          "Statistical tests of model performance",
-          "Testes estatísticos do desempenho dos modelos"),
-        "📈",
-    )
-
     run_script_button(
         "src/validacion_estadistica_modelos.py",
         _t("📈 Ejecutar pruebas estadísticas", "📈 Run statistical tests", "📈 Executar testes estatísticos"),

@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button
+from ui.components import empty_state, info_box, run_script_button
 
 COMP_DIR = Path("reports/modelos/comparativos")
 REPORTS_DIR = Path("reports/modelos")
@@ -44,15 +44,6 @@ def _load_f1_por_clase() -> pd.DataFrame | None:
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Comparación de Modelos", "Model Comparison", "Comparação de Modelos"),
-        _t("Ranking completo ordenado por MCC, F1-macro y Accuracy",
-          "Full ranking sorted by MCC, F1-macro and Accuracy",
-          "Ranking completo ordenado por MCC, F1-macro e Acurácia"),
-        "🏆",
-    )
-
     run_script_button(
         "src/evaluacion_comparativa.py",
         _t("🏆 Actualizar comparación", "🏆 Update comparison", "🏆 Atualizar comparação"),

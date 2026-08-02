@@ -2,7 +2,7 @@
 
 import streamlit as st
 from pathlib import Path
-from ui.components import section_header, info_box, empty_state, run_script_button
+from ui.components import info_box, empty_state, run_script_button
 
 
 PREPROCESSING_DIR = Path("reports/preprocessing")
@@ -45,13 +45,6 @@ def _show_config():
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Preprocesamiento y Aumento", "Preprocessing & Augmentation", "Pré-processamento e Aumento"),
-        _t("Configuración y ejemplos visuales del preprocesamiento", "Configuration and visual examples of preprocessing", "Configuração e exemplos visuais do pré-processamento"),
-        "🔄",
-    )
-
     run_script_button(
         "src/preprocesamiento_aumento.py",
         _t("🔄 Ejecutar preprocesamiento", "🔄 Run preprocessing", "🔄 Executar pré-processamento"),

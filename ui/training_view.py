@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button, reload_ranking_callback
+from ui.components import empty_state, info_box, run_script_button, reload_ranking_callback
 
 
 MODELS = [
@@ -193,13 +193,6 @@ def _render_model_card(model: dict):
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Entrenamiento de Modelos", "Model Training", "Treinamento de Modelos"),
-        _t("Estado, métricas y artefactos de los 5 modelos del sistema", "Status, metrics and artifacts of the 5 system models", "Status, métricas e artefatos dos 5 modelos do sistema"),
-        "🧠",
-    )
-
     run_script_button(
         "scripts/train_all.py",
         _t("🔥 Entrenar todos los modelos", "🔥 Train all models", "🔥 Treinar todos os modelos"),

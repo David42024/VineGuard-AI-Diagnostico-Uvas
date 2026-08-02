@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button, BASE_DIR
+from ui.components import empty_state, info_box, run_script_button, BASE_DIR
 
 
 EDA_DIR = Path("reports/eda")
@@ -45,13 +45,6 @@ def _show_dataset_dirs():
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Dataset y EDA", "Dataset & EDA", "Dataset e EDA"),
-        _t("Análisis exploratorio del dataset de hojas de vid", "Exploratory analysis of the vine leaf dataset", "Análise exploratória do dataset de folhas de videira"),
-        "📊",
-    )
-
     col1, col2 = st.columns(2)
     with col1:
         run_script_button(

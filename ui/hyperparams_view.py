@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box, run_script_button
+from ui.components import empty_state, info_box, run_script_button
 
 
 TUNING_DIR = Path("reports/modelos/tuning")
@@ -15,13 +15,6 @@ def _t(es: str, en: str, pt: str) -> str:
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Optimización de Hiperparámetros", "Hyperparameter Optimization", "Otimização de Hiperparâmetros"),
-        _t("Mejores parámetros encontrados por modelo", "Best parameters found per model", "Melhores parâmetros encontrados por modelo"),
-        "⚙️",
-    )
-
     run_script_button(
         "src/optimizacion_hiperparametros.py",
         _t("⚙️ Ejecutar tuning", "⚙️ Run tuning", "⚙️ Executar tuning"),

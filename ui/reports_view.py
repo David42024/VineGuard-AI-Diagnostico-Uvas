@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from ui.components import section_header, empty_state, info_box
+from ui.components import empty_state, info_box
 
 
 REPORT_DIRS = {
@@ -20,13 +20,6 @@ def _t(es: str, en: str, pt: str) -> str:
 
 
 def render():
-    lang = st.session_state.get("language", "es")
-    section_header(
-        _t("Reportes", "Reports", "Relatórios"),
-        _t("Visualiza y descarga los reportes generados por el sistema", "View and download system-generated reports", "Visualize e baixe os relatórios gerados pelo sistema"),
-        "📄",
-    )
-
     if st.button(_t("🔄 Actualizar lista de reportes", "🔄 Refresh report list", "🔄 Atualizar lista de relatórios"), key="refresh_reports"):
         st.rerun()
 
