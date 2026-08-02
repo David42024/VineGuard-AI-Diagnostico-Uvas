@@ -23,7 +23,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useTranslation } from "@/i18n";
-import api from "@/lib/api";
+import api, { getApiOrigin } from "@/lib/api";
 import type { DiagnosisResponse, ModelRanking } from "@/types/api";
 
 type ModelKey = "consensus" | "best_model" | "compare_all";
@@ -143,7 +143,7 @@ const handleDownload = async () => {
         { format: reportFormat }
       );
 
-      const origin = new URL(api.defaults.baseURL as string).origin;
+      const origin = getApiOrigin();
 
       const fileRes = await api.get(genRes.data.download_url, {
         baseURL: origin,

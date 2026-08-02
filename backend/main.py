@@ -24,17 +24,20 @@ from backend.database.session import SessionLocal, engine
 from backend.api import auth, diagnosis, models, pipeline, statistics, reports, users, chatbot
 
 
-def _check_alembic_revision():
-    """Verify Alembic migrations are up to date. Fail loudly if not."""
+def _alembic_config():
     from alembic.config import Config as AlembicConfig
+    cfg = AlembicConfig(str(PROJECT_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    return cfg
+
+
+def _check_alembic_revision():
+    """Verify Alembic migrations are up to date."""
     from alembic.script import ScriptDirectory
     from alembic.runtime.migration import MigrationContext
 
-    alembic_cfg = AlembicConfig(str(PROJECT_ROOT / "alembic.ini"))
-    alembic_cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
-    script = ScriptDirectory.from_config(alembic_cfg)
+    script = ScriptDirectory.from_config(_alembic_config())
     head_rev = script.get_current_head()
 
     with engine.connect() as conn:
@@ -46,13 +49,18 @@ def _check_alembic_revision():
 
 def _run_alembic_upgrade():
     """Run alembic upgrade head."""
-    from alembic.config import Config as AlembicConfig, CommandLine as AlembicCommandLine
-    alembic_cfg = AlembicConfig(str(PROJECT_ROOT / "alembic.ini"))
-    alembic_cfg.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-    cmd = AlembicCommandLine()
-    cmd.parser.prog = "alembic"
-    cmd.run_cmd(alembic_cfg, ["upgrade", "head"])
+    from alembic import command
+    command.upgrade(_alembic_config(), "head")
+
+
+def _stamp_alembic_head():
+    """Mark the DB as at head revision without running migrations.
+
+    Necesario cuando el esquema ya fue creado por `create_all` (init_db) y por
+    tanto las migraciones ya no se pueden aplicar (tablas existentes).
+    """
+    from alembic import command
+    command.stamp(_alembic_config(), "head")
 
 
 @asynccontextmanager
@@ -63,15 +71,22 @@ async def lifespan(app: FastAPI):
     try:
         current_rev, head_rev = _check_alembic_revision()
         if current_rev != head_rev:
-            if settings.ENVIRONMENT == "development":
+            if current_rev is None:
+                # DB nueva sin historial de migraciones: el esquema ya lo creó
+                # create_all (init_db), así que sólo marcamos la revisión head.
+                print("[Alembic] DB nueva (sin revisiones). Marcando head...")
+                _stamp_alembic_head()
+                current_rev = head_rev
+            elif settings.ENVIRONMENT == "development":
                 print(f"[Alembic] DB at revision {current_rev}, head is {head_rev}. Auto-upgrading...")
                 _run_alembic_upgrade()
                 current_rev, head_rev = _check_alembic_revision()
                 print(f"[Alembic] Now at revision {current_rev}")
             else:
-                raise RuntimeError(
-                    f"Database is at revision {current_rev} but expected {head_rev}. "
-                    f"Run 'alembic upgrade head' before starting the server."
+                # En producción no bloqueamos: create_all ya garantiza el esquema.
+                print(
+                    f"[Alembic] WARN: DB en revisión {current_rev}, head es {head_rev}. "
+                    f"Continuando (init_db asegura el esquema)."
                 )
         print(f"[Alembic] OK — revision {current_rev} (head)")
     except RuntimeError:

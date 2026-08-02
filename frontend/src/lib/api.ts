@@ -137,3 +137,17 @@ export const statisticsApi = {
 };
 
 export default api;
+
+// Devuelve el origen del API. Con NEXT_PUBLIC_API_URL relativo ("/api/v1",
+// produccion) new URL(...).origin falla; en ese caso se usa el origen actual.
+export function getApiOrigin(): string {
+  const baseURL = api.defaults.baseURL as string;
+  if (baseURL && baseURL.startsWith("http")) {
+    try {
+      return new URL(baseURL).origin;
+    } catch {
+      // Continuar con el origen del navegador
+    }
+  }
+  return typeof window !== "undefined" ? window.location.origin : "";
+}

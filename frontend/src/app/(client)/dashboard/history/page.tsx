@@ -31,7 +31,7 @@ import { formatDate, formatConfidence } from "@/lib/formatters";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import api from "@/lib/api";
+import api, { getApiOrigin } from "@/lib/api";
 import type { DiagnosisResponse } from "@/types";
 import { useTranslation } from "@/i18n";
 
@@ -134,7 +134,7 @@ export default function HistoryPage() {
         `/reports/diagnosis/${item.id}`,
         {}
       );
-      const origin = new URL(api.defaults.baseURL as string).origin;
+      const origin = getApiOrigin();
       const fileRes = await api.get(genRes.data.download_url, {
         baseURL: origin,
         responseType: "blob",
