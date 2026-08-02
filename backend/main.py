@@ -83,6 +83,29 @@ async def lifespan(app: FastAPI):
     # --- SQLAlchemy create_all (safe — only creates missing tables) ---
     init_db()
 
+    # --- Auto-seed de usuarios por defecto (DB efímera en Render) ---
+    if settings.AUTO_SEED_USERS:
+        from backend.core.security import hash_password
+        from backend.database.models import UserModel
+        db = SessionLocal()
+        try:
+            if db.query(UserModel).count() == 0:
+                default_users = [
+                    {"name": "Administrador", "username": "admin", "password": "admin123", "role": "admin"},
+                    {"name": "Usuario", "username": "usuario", "password": "12345", "role": "client"},
+                ]
+                for u in default_users:
+                    db.add(UserModel(
+                        name=u["name"],
+                        username=u["username"],
+                        password_hash=hash_password(u["password"]),
+                        role=u["role"],
+                    ))
+                db.commit()
+                print("[Startup] Usuarios por defecto creados (admin/admin123, usuario/12345)")
+        finally:
+            db.close()
+
     # --- Startup banner via SQLAlchemy ---
     try:
         from backend.database.models import UserModel, DiagnosticModel, ModelModel

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = f"sqlite:///{(BASE_DIR / 'data' / 'vinguard.db').as_posix()}"
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     CORS_ORIGINS_EXTRA: str = ""
 
     # Uploads
@@ -36,6 +36,9 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = "development"
+    # Auto-crea admin/usuario por defecto si la tabla de usuarios está vacía.
+    # Necesario en Render (free) porque el disco es efímero y se resetea en cada redeploy.
+    AUTO_SEED_USERS: bool = True
     # Chatbot (Groq — LLM gratuito, ver https://console.groq.com/keys)
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.1-8b-instant"
@@ -46,6 +49,22 @@ class Settings(BaseSettings):
         if self.CORS_ORIGINS_EXTRA:
             origins.extend([o.strip() for o in self.CORS_ORIGINS_EXTRA.split(",")])
         return origins
+
+    @property
+    def is_production(self) -> bool:
+        """True si no estamos en desarrollo (afecta cookies de sesión y CORS)."""
+        return self.ENVIRONMENT.strip().lower() not in ("development", "dev", "")
+
+    @property
+    def cookie_samesite(self) -> str:
+        # SameSite=None es obligatorio para cookies de sesión entre dominios
+        # distintos (frontend en Vercel, backend en Render).
+        return "none" if self.is_production else "lax"
+
+    @property
+    def cookie_secure(self) -> bool:
+        # SameSite=None solo se acepta en HTTPS (cookie marcada Secure).
+        return self.is_production
 
 
 settings = Settings()

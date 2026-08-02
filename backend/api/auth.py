@@ -34,8 +34,8 @@ def _set_token_cookie(response: Response, token: str):
         value=token,
         max_age=COOKIE_MAX_AGE,
         httponly=True,
-        samesite="lax",
-        secure=settings.ENVIRONMENT != "development",
+        samesite=settings.cookie_samesite,
+        secure=settings.cookie_secure,
         path="/",
     )
 
@@ -46,8 +46,8 @@ def _clear_token_cookie(response: Response):
         value="",
         max_age=0,
         httponly=True,
-        samesite="lax",
-        secure=settings.ENVIRONMENT != "development",
+        samesite=settings.cookie_samesite,
+        secure=settings.cookie_secure,
         path="/",
     )
 

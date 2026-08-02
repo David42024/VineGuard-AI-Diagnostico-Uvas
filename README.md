@@ -45,6 +45,35 @@ El sistema utiliza una arquitectura separada por responsabilidades:
 
 ---
 
+## Inicio rápido
+
+Con los entornos instalados (ver [Instalación](#instalación)), la aplicación web se levanta con dos comandos:
+
+```bash
+# 1) Backend (API FastAPI)
+uvicorn backend.main:app --reload
+# → http://localhost:8000   (Swagger: http://localhost:8000/docs)
+
+# 2) Frontend (Next.js)
+cd frontend
+npm install
+npm run dev
+# → http://localhost:3000
+```
+
+Abre **http://localhost:3000** e inicia sesión con las credenciales de demostración:
+
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `admin` | `admin123` | Administrador |
+| `usuario` | `12345` | Cliente |
+
+> Cambia estas credenciales antes de cualquier despliegue público.
+
+Si solo quieres usar la app como usuario, no necesitas ejecutar el pipeline de Machine Learning: los modelos ya entrenados están en `models/`.
+
+---
+
 ## Arquitectura
 
 ```text
@@ -121,6 +150,12 @@ Tablas principales:
 ---
 
 ## Dataset
+
+Las imágenes provienen del dataset público de **PlantVillage (Grape)** disponible en Kaggle:
+
+🔗 **https://www.kaggle.com/datasets/piyushmishra1999/plantvillage-grape**
+
+> Dataset de dominio público, usado únicamente con fines académicos y de investigación.
 
 Estructura esperada:
 
@@ -253,23 +288,36 @@ git clone https://github.com/David42024/VineGuard-AI-Diagnostico-Uvas.git
 cd VineGuard-AI-Diagnostico-Uvas
 ```
 
-## 2. Configurar Python
+## 2. Configurar los entornos Python
 
-### Windows
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### Linux o macOS
+El proyecto usa **dos entornos virtuales** con dependencias separadas:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Backend y API (FastAPI + pruebas pytest)
+python -m venv venv_api
+venv_api\Scripts\activate        # Windows
+pip install -r requirements-api.txt
+
+# Entrenamiento ML y Streamlit AI Lab
+python -m venv venv_ml
+venv_ml\Scripts\activate         # Windows
+pip install -r requirements-ml.txt
 ```
+
+En Linux o macOS activar con `source venv_api/bin/activate` y `source venv_ml/bin/activate`.
+
+> `requirements.txt` agrupa las dependencias de entrenamiento y UI para una instalación rápida en un solo entorno.
+
+### Nota sobre TensorFlow
+
+Si `pip install -r requirements-api.txt` falla por el conflicto de `typing-extensions` con TensorFlow 2.13:
+
+```bash
+pip install tensorflow==2.13.0 --no-deps
+pip install tensorflow-intel==2.13.0 --no-deps
+```
+
+TensorFlow 2.13 declara `typing-extensions<4.6`, pero Pydantic 2.5, FastAPI y SQLAlchemy necesitan `>=4.6`. Instalar TF con `--no-deps` evita esa restricción.
 
 ## 3. Configurar variables de entorno
 
@@ -337,6 +385,28 @@ http://localhost:3000
 
 ---
 
+## Pruebas
+
+La suite de pruebas del backend usa pytest (entorno `venv_api`). Los tests crean una **base de datos SQLite temporal aislada** y nunca tocan `data/vinguard.db`:
+
+```bash
+# Suite completa (incluye inferencia ML real, ~20 s)
+venv_api\Scripts\python.exe -m pytest -v
+
+# Solo pruebas rápidas (predicciones simuladas)
+venv_api\Scripts\python.exe -m pytest -m "not slow and not live" -v
+
+# Solo pruebas con modelos reales (carga de models/)
+venv_api\Scripts\python.exe -m pytest -m slow -v
+
+# Cobertura del backend
+venv_api\Scripts\python.exe -m pytest --cov=backend --cov-report=term-missing
+```
+
+> Las pruebas marcadas `slow`/`live` cargan los modelos entrenados reales y ejecutan predicciones con TensorFlow/scikit-learn.
+
+---
+
 ## Credenciales de demostración
 
 | Usuario | Contraseña | Rol |
@@ -345,6 +415,50 @@ http://localhost:3000
 | `usuario` | `12345` | Cliente |
 
 > Cambiar estas credenciales antes de cualquier despliegue público.
+
+---
+
+## Guía de uso
+
+### Roles
+
+- **Cliente**: sube imágenes, consulta su historial, repite diagnósticos y descarga sus reportes.
+- **Administrador**: todo lo anterior, más gestión de usuarios y estadísticas globales.
+
+### Hacer un diagnóstico
+
+1. Inicia sesión en `http://localhost:3000`.
+2. Ve a **Nuevo Diagnóstico**.
+3. Sube una foto clara de una hoja o racimo de uva (JPG, PNG, WebP o BMP).
+4. Elige el modo de análisis:
+   - **Consenso de 5 modelos**: el más robusto; combina los 5 modelos por votación.
+   - **Mejor modelo**: el que el pipeline seleccionó automáticamente.
+   - **Modelo individual**: M1 (SVM), M2 (Random Forest), M3 (KNN), H1 (CNN+SVM) o H2 (MobileNetV2+RF).
+5. Pulsa **Analizar** y espera el resultado (unos segundos).
+
+### Interpretar el resultado
+
+El diagnóstico muestra:
+
+- **Clase predicha** y su nombre (p. ej. `Black_rot` → Podredumbre negra).
+- **Confianza** de la predicción.
+- **Estado de salud** y **nivel de riesgo**.
+- **Distribución de probabilidades** por cada clase.
+
+> El resultado es una estimación generada por IA y no reemplaza la evaluación de un ingeniero agrónomo o especialista fitosanitario.
+
+### Historial y reportes
+
+- Tu historial queda en la sección **Diagnósticos**; el administrador puede ver el de todos los usuarios.
+- Desde el detalle de un diagnóstico puedes **repetirlo** o **generar un reporte** en Word (.docx), PDF o Excel (.xlsx), y **descargarlo** desde la sección **Reportes**.
+
+### Chatbot
+
+Usa el asistente virtual (por texto y voz) para preguntar cómo usar la app, qué enfermedades detecta o cómo generar reportes. Responde en español, inglés o portugués según el idioma de la interfaz.
+
+### Apariencia e idioma
+
+La interfaz es **multilingüe** (español, inglés y portugués) y admite **modo claro y oscuro**, desde el menú de la aplicación.
 
 ---
 
@@ -478,11 +592,29 @@ streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 ```
 
+Variables de entorno obligatorias en Render:
+
+```env
+ENVIRONMENT=production
+SECRET_KEY=<clave aleatoria larga, al menos 32 caracteres>
+CORS_ORIGINS_EXTRA=https://<tu-app>.vercel.app
+```
+
+> `ENVIRONMENT=production` activa la cookie de sesión `SameSite=None; Secure`, requisito para
+> que el login funcione cuando el frontend (Vercel) y el backend (Render) están en dominios
+> distintos. Sin esto, el navegador descarta la cookie y `/auth/me` devuelve 401.
+>
+> En el arranque, si la tabla de usuarios está vacía, se crean automáticamente
+> `admin/admin123` y `usuario/12345` (`AUTO_SEED_USERS=true`).
+
 ### Next.js en Vercel
 
 ```env
 NEXT_PUBLIC_API_URL=https://vinguard-api.onrender.com/api/v1
 ```
+
+> La URL de Render debe ser la del backend real (`https://<tu-backend>.onrender.com/api/v1`),
+> no `http://localhost:8000`.
 
 > SQLite debe usar almacenamiento persistente en Render para evitar la pérdida de usuarios y diagnósticos.
 

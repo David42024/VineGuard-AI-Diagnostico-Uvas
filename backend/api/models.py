@@ -86,42 +86,6 @@ def list_models(current_user: TokenData = Depends(get_current_user)):
     return results
 
 
-@router.get("/{model_id}", response_model=ModelInfo)
-def get_model(model_id: str, current_user: TokenData = Depends(get_current_user)):
-    if model_id not in MODEL_KEYS:
-        raise HTTPException(status_code=404, detail="Modelo no encontrado")
-    model_status = get_model_status()
-    status_info = model_status.get(model_id, {})
-    available = status_info.get("disponible", False)
-    reports_dir = MODEL_REPORT_DIRS.get(model_id)
-    metrics = None
-    if reports_dir:
-        resultados_file = reports_dir / f"resultados_{reports_dir.name}.csv"
-        if not resultados_file.exists():
-            resultados_file = reports_dir / f"resultados_{model_id.lower()}.csv"
-        raw = _read_csv_metrics(resultados_file)
-        if raw:
-            metrics = ModelMetrics(
-                accuracy=raw.get("accuracy"),
-                balanced_accuracy=raw.get("balanced_accuracy"),
-                precision=raw.get("precision"),
-                recall=raw.get("recall"),
-                f1_score=raw.get("f1_score") or raw.get("f1_macro"),
-                mcc=raw.get("mcc"),
-                auc_macro=raw.get("auc_macro"),
-                auc_micro=raw.get("auc_micro"),
-            )
-    return ModelInfo(
-        id=model_id,
-        name=MODEL_DISPLAY_NAMES.get(model_id, model_id),
-        type=MODEL_TYPES.get(model_id, "Unknown"),
-        status="available" if available else "unavailable",
-        available=available,
-        metrics=metrics,
-        reports_dir=str(reports_dir) if reports_dir else None,
-    )
-
-
 @router.post("/test", response_model=ModelTestResponse)
 def test_model(
     file: UploadFile = File(...),
@@ -250,4 +214,40 @@ def get_best(current_user: TokenData = Depends(get_current_user)):
         mcc=mcc,
         selection_criteria=criteria.strip(),
         details=content,
+    )
+
+
+@router.get("/{model_id}", response_model=ModelInfo)
+def get_model(model_id: str, current_user: TokenData = Depends(get_current_user)):
+    if model_id not in MODEL_KEYS:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado")
+    model_status = get_model_status()
+    status_info = model_status.get(model_id, {})
+    available = status_info.get("disponible", False)
+    reports_dir = MODEL_REPORT_DIRS.get(model_id)
+    metrics = None
+    if reports_dir:
+        resultados_file = reports_dir / f"resultados_{reports_dir.name}.csv"
+        if not resultados_file.exists():
+            resultados_file = reports_dir / f"resultados_{model_id.lower()}.csv"
+        raw = _read_csv_metrics(resultados_file)
+        if raw:
+            metrics = ModelMetrics(
+                accuracy=raw.get("accuracy"),
+                balanced_accuracy=raw.get("balanced_accuracy"),
+                precision=raw.get("precision"),
+                recall=raw.get("recall"),
+                f1_score=raw.get("f1_score") or raw.get("f1_macro"),
+                mcc=raw.get("mcc"),
+                auc_macro=raw.get("auc_macro"),
+                auc_micro=raw.get("auc_micro"),
+            )
+    return ModelInfo(
+        id=model_id,
+        name=MODEL_DISPLAY_NAMES.get(model_id, model_id),
+        type=MODEL_TYPES.get(model_id, "Unknown"),
+        status="available" if available else "unavailable",
+        available=available,
+        metrics=metrics,
+        reports_dir=str(reports_dir) if reports_dir else None,
     )
