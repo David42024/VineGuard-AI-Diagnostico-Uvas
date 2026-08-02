@@ -609,12 +609,23 @@ CORS_ORIGINS_EXTRA=https://<tu-app>.vercel.app
 
 ### Next.js en Vercel
 
+El frontend debe apuntar al backend **a través de su propio dominio** (proxy de
+Next.js) para que la cookie de sesión quede en `vercel.app` y el middleware de
+protección de rutas pueda verla. Usa una URL **relativa**:
+
 ```env
-NEXT_PUBLIC_API_URL=https://vinguard-api.onrender.com/api/v1
+NEXT_PUBLIC_API_URL=/api/v1
+API_PROXY_ORIGIN=https://vinguard-api.onrender.com
+JWT_SECRET=<misma clave que SECRET_KEY del backend>
 ```
 
-> La URL de Render debe ser la del backend real (`https://<tu-backend>.onrender.com/api/v1`),
-> no `http://localhost:8000`.
+> `next.config.mjs` reescribe `/api/*` hacia `API_PROXY_ORIGIN`. El navegador solo
+> habla con `vercel.app` (mismo origen), por lo que el `Set-Cookie` queda en ese
+> dominio y `/admin` deja de redirigir a `/login`.
+>
+> No uses `http://localhost:8000` en producción, ni una URL absoluta de Render como
+> `NEXT_PUBLIC_API_URL`, porque la cookie se guardaría en el dominio de Render y el
+> frontend nunca la vería.
 
 > SQLite debe usar almacenamiento persistente en Render para evitar la pérdida de usuarios y diagnósticos.
 
