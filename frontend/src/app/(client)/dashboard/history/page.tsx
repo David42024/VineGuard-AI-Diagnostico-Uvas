@@ -33,6 +33,7 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
 import api from "@/lib/api";
 import type { DiagnosisResponse } from "@/types";
+import { useTranslation } from "@/i18n";
 
 interface HistoryItem {
   id: number;
@@ -47,6 +48,7 @@ interface HistoryItem {
 const ITEMS_PER_PAGE = 6;
 
 export default function HistoryPage() {
+  const t = useTranslation();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -66,7 +68,7 @@ export default function HistoryPage() {
     setDetailData(null);
     api.get(`/diagnoses/${viewItemId}`)
       .then((res) => setDetailData(res.data))
-      .catch(() => toast.error("Error al cargar detalles del diagnóstico"))
+      .catch(() => toast.error(t("history.toastDetailError")))
       .finally(() => setLoadingDetail(false));
   }, [viewItemId]);
 
@@ -82,7 +84,7 @@ export default function HistoryPage() {
         confidence?: number;
       }) => ({
         id: d.id,
-        filename: d.filename || "desconocido",
+        filename: d.filename || t("dashboard.unknown"),
         date: d.created_at || "",
         model: d.model_used || "—",
         prediction: d.result?.replace(/_/g, " ") || "—",
@@ -91,7 +93,7 @@ export default function HistoryPage() {
       }));
       setItems(list);
     }).catch(() => {
-      setError("Error al cargar el historial");
+      setError(t("history.loadError"));
     }).finally(() => setLoading(false));
   }, []);
 
@@ -108,9 +110,9 @@ export default function HistoryPage() {
     try {
       await api.delete(`/diagnoses/${id}`);
       setItems((prev) => prev.filter((item) => item.id !== id));
-      toast.success(`Diagnóstico #${id} eliminado`);
+      toast.success(t("history.deleteSuccess").replace("{id}", String(id)));
     } catch {
-      toast.error("Error al eliminar el diagnóstico");
+      toast.error(t("history.deleteError"));
     }
     setDeleteConfirm(null);
   };
@@ -120,9 +122,9 @@ export default function HistoryPage() {
       const formData = new FormData();
       formData.append("model_key", "consensus");
       await api.post(`/diagnoses/${item.id}/repeat`, formData);
-      toast.success(`Re-analizando ${item.filename}`);
+      toast.success(t("history.repeatSuccess").replace("{filename}", item.filename));
     } catch {
-      toast.error("Error al re-analizar el diagnóstico");
+      toast.error(t("history.repeatError"));
     }
   };
 
@@ -146,9 +148,9 @@ export default function HistoryPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-      toast.success(`Reporte de ${item.filename} descargado`);
+      toast.success(t("history.downloadSuccess").replace("{filename}", item.filename));
     } catch {
-      toast.error("Error al descargar el reporte");
+      toast.error(t("history.downloadError"));
     }
   };
 
@@ -156,10 +158,10 @@ export default function HistoryPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Historial de Diagnósticos
+          {t("history.title")}
         </h2>
         <p className="text-muted-foreground">
-          Consulta todos tus diagnósticos anteriores
+          {t("history.subtitle")}
         </p>
       </div>
 
@@ -167,7 +169,7 @@ export default function HistoryPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por archivo..."
+            placeholder={t("history.searchPlaceholder")}
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -177,9 +179,9 @@ export default function HistoryPage() {
 
       {paged.length === 0 ? (
         <EmptyState
-          title="Sin diagnósticos"
-          description="No se encontraron diagnósticos que coincidan con tu búsqueda."
-          actionLabel="Ir a Nuevo Diagnóstico"
+          title={t("history.emptyTitle")}
+          description={t("history.emptyDesc")}
+          actionLabel={t("history.emptyAction")}
         />
       ) : (
         <>
@@ -211,7 +213,7 @@ export default function HistoryPage() {
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1" onClick={() => setViewItemId(item.id)}>
-                      <Eye className="h-4 w-4 mr-1" /> Ver
+                      <Eye className="h-4 w-4 mr-1" /> {t("history.view")}
                     </Button>
                     <Button
                       variant="outline"
@@ -219,7 +221,7 @@ export default function HistoryPage() {
                       className="flex-1"
                       onClick={() => handleRepeat(item)}
                     >
-                      <RotateCcw className="h-4 w-4 mr-1" /> Repetir
+                      <RotateCcw className="h-4 w-4 mr-1" /> {t("history.repeat")}
                     </Button>
                     <Button
                       variant="outline"
@@ -245,10 +247,12 @@ export default function HistoryPage() {
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Eliminar diagnóstico</DialogTitle>
+                          <DialogTitle>{t("history.deleteDialogTitle")}</DialogTitle>
                           <DialogDescription>
-                            ¿Estás seguro de eliminar el diagnóstico de{" "}
-                            {item.filename}? Esta acción no se puede deshacer.
+                            {t("history.deleteDialogDesc").replace(
+                              "{filename}",
+                              item.filename
+                            )}
                           </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>
@@ -256,13 +260,13 @@ export default function HistoryPage() {
                             variant="outline"
                             onClick={() => setDeleteConfirm(null)}
                           >
-                            Cancelar
+                            {t("common.cancel")}
                           </Button>
                           <Button
                             variant="destructive"
                             onClick={() => handleDelete(item.id)}
                           >
-                            Eliminar
+                            {t("common.delete")}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -276,18 +280,18 @@ export default function HistoryPage() {
           {/* Desktop: table view */}
           <Card className="hidden md:block">
             <CardHeader>
-              <CardTitle className="text-lg">Historial</CardTitle>
+              <CardTitle className="text-lg">{t("history.tableTitle")}</CardTitle>
             </CardHeader>
             <CardContent>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left font-medium text-muted-foreground p-3">Archivo</th>
-                    <th className="text-left font-medium text-muted-foreground p-3">Fecha</th>
-                    <th className="text-left font-medium text-muted-foreground p-3">Modelo</th>
-                    <th className="text-left font-medium text-muted-foreground p-3">Predicción</th>
-                    <th className="text-left font-medium text-muted-foreground p-3">Confianza</th>
-                    <th className="text-right font-medium text-muted-foreground p-3">Acciones</th>
+                    <th className="text-left font-medium text-muted-foreground p-3">{t("reports.columnFile")}</th>
+                    <th className="text-left font-medium text-muted-foreground p-3">{t("reports.columnDate")}</th>
+                    <th className="text-left font-medium text-muted-foreground p-3">{t("common.model")}</th>
+                    <th className="text-left font-medium text-muted-foreground p-3">{t("admin.prediction")}</th>
+                    <th className="text-left font-medium text-muted-foreground p-3">{t("result.confidence")}</th>
+                    <th className="text-right font-medium text-muted-foreground p-3">{t("reports.columnActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -350,10 +354,12 @@ export default function HistoryPage() {
                             </DialogTrigger>
                             <DialogContent>
                               <DialogHeader>
-                                <DialogTitle>Eliminar diagnóstico</DialogTitle>
+                                <DialogTitle>{t("history.deleteDialogTitle")}</DialogTitle>
                                 <DialogDescription>
-                                  ¿Estás seguro de eliminar el diagnóstico de{" "}
-                                  {item.filename}?
+                                  {t("history.deleteDialogDesc").replace(
+                                    "{filename}",
+                                    item.filename
+                                  )}
                                 </DialogDescription>
                               </DialogHeader>
                               <DialogFooter>
@@ -361,13 +367,13 @@ export default function HistoryPage() {
                                   variant="outline"
                                   onClick={() => setDeleteConfirm(null)}
                                 >
-                                  Cancelar
+                                  {t("common.cancel")}
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   onClick={() => handleDelete(item.id)}
                                 >
-                                  Eliminar
+                                  {t("common.delete")}
                                 </Button>
                               </DialogFooter>
                             </DialogContent>
@@ -383,9 +389,10 @@ export default function HistoryPage() {
 
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Mostrando {(page - 1) * ITEMS_PER_PAGE + 1}-
-              {Math.min(page * ITEMS_PER_PAGE, filtered.length)} de{" "}
-              {filtered.length}
+              {t("history.pagination")
+                .replace("{from}", String((page - 1) * ITEMS_PER_PAGE + 1))
+                .replace("{to}", String(Math.min(page * ITEMS_PER_PAGE, filtered.length)))
+                .replace("{total}", String(filtered.length))}
             </p>
             <div className="flex gap-2">
               <Button
@@ -413,9 +420,9 @@ export default function HistoryPage() {
       <Dialog open={viewItemId !== null} onOpenChange={(open) => { if (!open) setViewItemId(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalle del Diagnóstico</DialogTitle>
+            <DialogTitle>{t("history.detailTitle")}</DialogTitle>
             <DialogDescription>
-              Información completa del análisis realizado por la IA
+              {t("history.detailDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -427,7 +434,7 @@ export default function HistoryPage() {
 
           {!loadingDetail && !detailData && (
             <p className="text-center text-muted-foreground py-8">
-              No se pudieron cargar los detalles.
+              {t("history.detailLoadError")}
             </p>
           )}
 
@@ -438,7 +445,7 @@ export default function HistoryPage() {
                 <div className="rounded-lg overflow-hidden border bg-muted/30">
                   <img
                     src={detailData.image_url}
-                    alt="Hoja analizada"
+                    alt={t("history.imageAlt")}
                     className="w-full max-h-80 object-contain"
                   />
                 </div>
@@ -447,21 +454,21 @@ export default function HistoryPage() {
               {/* Prediction summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-lg border p-4 space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Predicción</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">{t("admin.prediction")}</h4>
                   <p className="text-xl font-bold">{detailData.prediction.display_name}</p>
                   {detailData.prediction.health_status && (
                     <Badge variant={detailData.prediction.health_status === "healthy" ? "success" : "destructive"}>
-                      {detailData.prediction.health_status === "healthy" ? "Sana" : "Enferma"}
+                      {detailData.prediction.health_status === "healthy" ? t("disease.healthy") : t("disease.diseased")}
                     </Badge>
                   )}
                   {detailData.prediction.risk_level && detailData.prediction.risk_level !== "none" && (
                     <p className="text-xs text-muted-foreground">
-                      Riesgo: {detailData.prediction.risk_level}
+                      {t("history.risk").replace("{risk}", detailData.prediction.risk_level)}
                     </p>
                   )}
                 </div>
                 <div className="rounded-lg border p-4 space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Confianza</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">{t("result.confidence")}</h4>
                   <p className="text-2xl font-bold">{formatConfidence(detailData.prediction.confidence)}</p>
                   <div className="w-full bg-muted rounded-full h-2.5">
                     <div
@@ -474,21 +481,21 @@ export default function HistoryPage() {
 
               {/* Model & metadata */}
               <div className="rounded-lg border p-4 space-y-3">
-                <h4 className="text-sm font-medium text-muted-foreground">Información del modelo</h4>
+                <h4 className="text-sm font-medium text-muted-foreground">{t("history.modelInfo")}</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-muted-foreground">Modelo:</span>
+                  <span className="text-muted-foreground">{t("history.modelLabel")}</span>
                   <span>{detailData.model.name} ({detailData.model.key})</span>
-                  <span className="text-muted-foreground">Versión:</span>
+                  <span className="text-muted-foreground">{t("history.versionLabel")}</span>
                   <span>{detailData.model.version}</span>
                   {detailData.created_at && (
                     <>
-                      <span className="text-muted-foreground">Fecha:</span>
+                      <span className="text-muted-foreground">{t("history.dateLabel")}</span>
                       <span>{formatDate(detailData.created_at)}</span>
                     </>
                   )}
                   {detailData.inference_time_ms != null && (
                     <>
-                      <span className="text-muted-foreground">Tiempo de inferencia:</span>
+                      <span className="text-muted-foreground">{t("history.inferenceTimeLabel")}</span>
                       <span>{detailData.inference_time_ms.toFixed(1)} ms</span>
                     </>
                   )}
@@ -498,7 +505,7 @@ export default function HistoryPage() {
               {/* Probabilities */}
               {detailData.probabilities && Object.keys(detailData.probabilities).length > 0 && (
                 <div className="rounded-lg border p-4 space-y-3">
-                  <h4 className="text-sm font-medium text-muted-foreground">Probabilidades por clase</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">{t("history.probabilitiesTitle")}</h4>
                   <div className="space-y-2">
                     {Object.entries(detailData.probabilities)
                       .sort(([, a], [, b]) => b - a)
@@ -536,7 +543,7 @@ export default function HistoryPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewItemId(null)}>
-              Cerrar
+              {t("history.close")}
             </Button>
           </DialogFooter>
         </DialogContent>

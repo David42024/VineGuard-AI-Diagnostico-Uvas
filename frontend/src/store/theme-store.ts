@@ -6,48 +6,50 @@ interface ThemeState {
   setLanguage: (lang: "es" | "en" | "pt") => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  hydrate: () => void;
 }
 
-// Obtener estado inicial de localStorage
-const getInitialState = (): Partial<ThemeState> => {
-  if (typeof window === "undefined") return {};
-  const saved = localStorage.getItem("themeState");
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return {};
-    }
+const STORAGE_KEY = "themeState";
+
+// Persistencia sólo en cliente (nunca en SSR para evitar errores de hidratación)
+function persistState(language: ThemeState["language"], sidebarCollapsed: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ language, sidebarCollapsed }));
+  } catch {
+    // Ignorar errores (modo privado, cuota llena, etc.)
   }
-  return {};
-};
+}
 
-const initialState = getInitialState();
-
-export const useThemeStore = create<ThemeState>((set, get) => {
-  // Guardar estado en localStorage cada vez que cambie
-  const saveState = () => {
-    const state = get();
-    localStorage.setItem("themeState", JSON.stringify({
-      language: state.language,
-      sidebarCollapsed: state.sidebarCollapsed
-    }));
-  };
-
-  return {
-    language: (initialState.language as "es" | "en" | "pt") || "es",
-    sidebarCollapsed: initialState.sidebarCollapsed ?? false,
-    setLanguage: (language) => {
-      set({ language });
-      saveState();
-    },
-    toggleSidebar: () => {
-      set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
-      saveState();
-    },
-    setSidebarCollapsed: (sidebarCollapsed) => {
-      set({ sidebarCollapsed });
-      saveState();
-    },
-  };
-});
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  language: "es",
+  sidebarCollapsed: false,
+  setLanguage: (language) => {
+    set({ language });
+    persistState(language, get().sidebarCollapsed);
+  },
+  toggleSidebar: () => {
+    const sidebarCollapsed = !get().sidebarCollapsed;
+    set({ sidebarCollapsed });
+    persistState(get().language, sidebarCollapsed);
+  },
+  setSidebarCollapsed: (sidebarCollapsed) => {
+    set({ sidebarCollapsed });
+    persistState(get().language, sidebarCollapsed);
+  },
+  // Se invoca únicamente tras el montaje en el cliente (ver StoreHydrator)
+  hydrate: () => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      set({
+        language: (parsed.language as "es" | "en" | "pt") || "es",
+        sidebarCollapsed: parsed.sidebarCollapsed ?? false,
+      });
+    } catch {
+      // Ignorar almacenamiento corrupto
+    }
+  },
+}));

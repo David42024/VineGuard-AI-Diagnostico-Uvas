@@ -33,6 +33,7 @@ import type {
   CochranQ,
 } from "@/types/api";
 import { statisticsApi } from "@/lib/api";
+import { useTranslation } from "@/i18n";
 
 // ── Format helpers ─────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ function getShortName(modelo: string): string {
 // ── Component ──────────────────────────────────────────────────────
 
 export default function StatisticsPage() {
+  const t = useTranslation();
   const [comparison, setComparison] = useState<ModelComparisonRow[]>([]);
   const [cvResultados, setCvResultados] = useState<CrossValSummaryRow[]>([]);
   const [cvPorFold, setCvPorFold] = useState<CrossValFoldRow[]>([]);
@@ -102,7 +104,7 @@ export default function StatisticsPage() {
       setMcNemar(mcn.holmPosthoc ?? []);
       setCochran(coch.cochranQ);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al cargar estadisticas");
+      setError(e instanceof Error ? e.message : t("stats.loadError"));
     } finally {
       setLoading(false);
     }
@@ -122,19 +124,19 @@ export default function StatisticsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Estadisticas y Validacion
+          {t("statistics.title")}
         </h2>
         <p className="text-muted-foreground">
-          Analisis detallado del rendimiento de modelos y validacion estadistica
+          {t("stats.subtitle")}
         </p>
       </div>
 
       <Tabs defaultValue="comparison">
         <TabsList>
-          <TabsTrigger value="comparison">Comparacion</TabsTrigger>
-          <TabsTrigger value="crossval">Validacion Cruzada</TabsTrigger>
-          <TabsTrigger value="bootstrap">Bootstrap</TabsTrigger>
-          <TabsTrigger value="tests">Pruebas Estadisticas</TabsTrigger>
+          <TabsTrigger value="comparison">{t("stats.tabComparison")}</TabsTrigger>
+          <TabsTrigger value="crossval">{t("stats.tabCrossval")}</TabsTrigger>
+          <TabsTrigger value="bootstrap">{t("stats.tabBootstrap")}</TabsTrigger>
+          <TabsTrigger value="tests">{t("stats.tabTests")}</TabsTrigger>
         </TabsList>
 
         {/* ──────── COMPARISON TAB ──────── */}
@@ -142,11 +144,11 @@ export default function StatisticsPage() {
           {loading && comparison.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Cargando...
+              {t("common.loading")}
             </div>
           ) : comparison.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No hay datos de comparacion. Ejecuta <code>src/evaluacion_comparativa.py</code>.
+              {t("stats.noComparison")} <code>src/evaluacion_comparativa.py</code>.
             </p>
           ) : (
             <>
@@ -154,20 +156,20 @@ export default function StatisticsPage() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Brain className="h-5 w-5 text-primary" />
-                    Comparacion de Modelos
+                    {t("stats.modelComparison")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Modelo</TableHead>
-                        <TableHead>Accuracy</TableHead>
-                        <TableHead>Balanced Accuracy</TableHead>
-                        <TableHead>Precision macro</TableHead>
-                        <TableHead>Recall macro</TableHead>
-                        <TableHead>F1-macro</TableHead>
-                        <TableHead>MCC</TableHead>
+                        <TableHead>{t("common.model")}</TableHead>
+                        <TableHead>{t("common.accuracy")}</TableHead>
+                        <TableHead>{t("stats.balancedAccuracy")}</TableHead>
+                        <TableHead>{t("stats.precisionMacro")}</TableHead>
+                        <TableHead>{t("stats.recallMacro")}</TableHead>
+                        <TableHead>{t("common.f1Macro")}</TableHead>
+                        <TableHead>{t("common.mcc")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -187,21 +189,13 @@ export default function StatisticsPage() {
                   <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
                     <p className="text-sm font-medium flex items-center gap-2">
                       <Lightbulb className="h-4 w-4 text-amber-500" />
-                      Interpretacion
+                      {t("stats.interpretation")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Esta tabla compara las metricas principales de todos los
-                      modelos. El MCC es la metrica mas importante — un valor
-                      cercano a 1 indica prediccion perfecta. F1-macro balancea
-                      precision y recall por clase.
+                      {t("stats.compInterpretation")}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      <strong>Balanced Accuracy</strong> mide el recall promedio
-                      entre las clases y da el mismo peso a cada una, por lo que
-                      resulta util cuando existe desbalance de datos. En este
-                      analisis multiclase, Balanced Accuracy coincide con Recall
-                      macro porque ambas representan el promedio del recall de
-                      las clases.
+                      <strong>{t("stats.balancedAccuracy")}</strong> {t("stats.balancedAccInterpretation")}
                     </p>
                   </div>
                 </CardContent>
@@ -209,7 +203,7 @@ export default function StatisticsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Metricas por Modelo</CardTitle>
+                  <CardTitle className="text-lg">{t("stats.metricsByModel")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <BarChart
@@ -222,9 +216,9 @@ export default function StatisticsPage() {
                     }))}
                     xKey="name"
                     bars={[
-                      { key: "mcc", color: "#2563EB", name: "MCC (%)" },
-                      { key: "f1", color: "#166534", name: "F1-macro (%)" },
-                      { key: "accuracy", color: "#22C55E", name: "Accuracy (%)" },
+                      { key: "mcc", color: "#2563EB", name: t("admin.mccPct") },
+                      { key: "f1", color: "#166534", name: t("stats.f1MacroPct") },
+                      { key: "accuracy", color: "#22C55E", name: t("admin.accuracyPct") },
                     ]}
                   />
                 </CardContent>
@@ -233,19 +227,19 @@ export default function StatisticsPage() {
               {effectSize.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Tamano del Efecto</CardTitle>
+                    <CardTitle className="text-lg">{t("stats.effectSize")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Modelo 1</TableHead>
-                          <TableHead>Modelo 2</TableHead>
-                          <TableHead>Diff Accuracy</TableHead>
-                          <TableHead>Diff F1-macro</TableHead>
-                          <TableHead>Diff MCC</TableHead>
-                          <TableHead>Odds Ratio</TableHead>
-                          <TableHead>Favorecido</TableHead>
+                          <TableHead>{t("stats.model1")}</TableHead>
+                          <TableHead>{t("stats.model2")}</TableHead>
+                          <TableHead>{t("stats.diffAccuracy")}</TableHead>
+                          <TableHead>{t("stats.diffF1")}</TableHead>
+                          <TableHead>{t("stats.diffMcc")}</TableHead>
+                          <TableHead>{t("stats.oddsRatio")}</TableHead>
+                          <TableHead>{t("stats.favored")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -269,13 +263,10 @@ export default function StatisticsPage() {
                     <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
                       <p className="text-sm font-medium flex items-center gap-2">
                         <Lightbulb className="h-4 w-4 text-amber-500" />
-                        Interpretacion
+                        {t("stats.interpretation")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Diferencias positivas favorecen al Modelo 1. El odds
-                        ratio indica que tan mas frecuente es que un modelo
-                        acierte cuando el otro falla. Valores &gt; 1 favorecen
-                        al primer modelo.
+                        {t("stats.effectSizeInterpretation")}
                       </p>
                     </div>
                   </CardContent>
@@ -290,11 +281,11 @@ export default function StatisticsPage() {
           {loading && cvResultados.length === 0 && cvPorFold.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Cargando...
+              {t("common.loading")}
             </div>
           ) : cvResultados.length === 0 && cvPorFold.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No hay datos de validacion cruzada. Ejecuta <code>src/cross_validation_modelos.py</code>.
+              {t("stats.noCv")} <code>src/cross_validation_modelos.py</code>.
             </p>
           ) : (
             <>
@@ -303,24 +294,24 @@ export default function StatisticsPage() {
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      Validacion Cruzada — Detalle por Fold
+                      {t("stats.cvFoldDetail")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Fold</TableHead>
-                          <TableHead>Modelo</TableHead>
-                          <TableHead>Accuracy</TableHead>
-                          <TableHead>F1-macro</TableHead>
-                          <TableHead>MCC</TableHead>
+                          <TableHead>{t("stats.fold")}</TableHead>
+                          <TableHead>{t("common.model")}</TableHead>
+                          <TableHead>{t("common.accuracy")}</TableHead>
+                          <TableHead>{t("common.f1Macro")}</TableHead>
+                          <TableHead>{t("common.mcc")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {cvPorFold.map((cv, i) => (
                           <TableRow key={i}>
-                            <TableCell className="font-medium">Fold {cv.fold}</TableCell>
+                            <TableCell className="font-medium">{t("stats.foldNumber").replace("{number}", String(cv.fold))}</TableCell>
                             <TableCell>{cv.modelo}</TableCell>
                             <TableCell>
                               <Badge variant="success">{formatPct(cv.accuracy)}</Badge>
@@ -338,7 +329,7 @@ export default function StatisticsPage() {
               {cvResultados.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Resumen por Modelo</CardTitle>
+                    <CardTitle className="text-lg">{t("stats.cvSummary")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {cvResultados.map((m) => (
@@ -346,22 +337,22 @@ export default function StatisticsPage() {
                         <h4 className="font-semibold text-sm">{m.modelo}</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="p-3 bg-muted rounded-lg">
-                            <p className="text-xs text-muted-foreground">Accuracy media</p>
+                            <p className="text-xs text-muted-foreground">{t("stats.accuracyMean")}</p>
                             <p className="text-lg font-bold">{formatPct(m.accuracyMean)}</p>
                             <p className="text-xs text-muted-foreground">&plusmn; {formatPct(m.accuracyStd)}</p>
                           </div>
                           <div className="p-3 bg-muted rounded-lg">
-                            <p className="text-xs text-muted-foreground">F1-macro medio</p>
+                            <p className="text-xs text-muted-foreground">{t("stats.f1Mean")}</p>
                             <p className="text-lg font-bold">{formatPct(m.f1MacroMean)}</p>
                             <p className="text-xs text-muted-foreground">&plusmn; {formatPct(m.f1MacroStd)}</p>
                           </div>
                           <div className="p-3 bg-muted rounded-lg">
-                            <p className="text-xs text-muted-foreground">MCC medio</p>
+                            <p className="text-xs text-muted-foreground">{t("stats.mccMean")}</p>
                             <p className="text-lg font-bold">{formatDecimal(m.mccMean)}</p>
                             <p className="text-xs text-muted-foreground">&plusmn; {formatDecimal(m.mccStd)}</p>
                           </div>
                           <div className="p-3 bg-muted rounded-lg">
-                            <p className="text-xs text-muted-foreground">Folds</p>
+                            <p className="text-xs text-muted-foreground">{t("stats.folds")}</p>
                             <p className="text-lg font-bold">{m.nFolds}</p>
                           </div>
                         </div>
@@ -369,22 +360,19 @@ export default function StatisticsPage() {
                     ))}
                     <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                       <p className="text-xs text-amber-800 dark:text-amber-200">
-                        <strong>Nota:</strong> La validacion cruzada se realizo
-                        sobre TRAIN. No corresponde a la evaluacion final sobre
-                        TEST. Las metricas sobre TEST se encuentran en la pestana
-                        Comparacion.
+                        <strong>{t("stats.note")}</strong> {t("stats.cvNote")}
                       </p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg space-y-1">
                       <p className="text-sm font-medium flex items-center gap-2">
                         <Lightbulb className="h-4 w-4 text-amber-500" />
-                        Interpretacion
+                        {t("stats.interpretation")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        La validacion cruzada divide los datos en {cvResultados[0]?.nFolds ?? "N"} particiones
-                        y evalua cada modelo en cada particion. La media y desviacion
-                        estandar resumen su estabilidad: baja desviacion indica
-                        rendimiento consistente entre folds.
+                        {t("stats.cvInterpretation").replace(
+                          "{folds}",
+                          String(cvResultados[0]?.nFolds ?? "N")
+                        )}
                       </p>
                     </div>
                   </CardContent>
@@ -399,11 +387,11 @@ export default function StatisticsPage() {
           {loading && bootstrap.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Cargando...
+              {t("common.loading")}
             </div>
           ) : bootstrap.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No hay intervalos bootstrap. Ejecuta{" "}
+              {t("stats.noBootstrap")}{" "}
               <code>src/validacion_estadistica_modelos.py</code>.
             </p>
           ) : (
@@ -411,20 +399,20 @@ export default function StatisticsPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-blue-600" />
-                  Intervalos de Confianza Bootstrap (95%)
+                  {t("stats.bootstrapTitle")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Modelo</TableHead>
-                      <TableHead>Accuracy media</TableHead>
-                      <TableHead>Accuracy IC 95%</TableHead>
-                      <TableHead>F1-macro medio</TableHead>
-                      <TableHead>F1-macro IC 95%</TableHead>
-                      <TableHead>MCC medio</TableHead>
-                      <TableHead>MCC IC 95%</TableHead>
+                      <TableHead>{t("common.model")}</TableHead>
+                      <TableHead>{t("stats.accuracyMean")}</TableHead>
+                      <TableHead>{t("stats.accuracyCi")}</TableHead>
+                      <TableHead>{t("stats.f1Mean")}</TableHead>
+                      <TableHead>{t("stats.f1Ci")}</TableHead>
+                      <TableHead>{t("stats.mccMean")}</TableHead>
+                      <TableHead>{t("stats.mccCi")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -452,14 +440,10 @@ export default function StatisticsPage() {
                 <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <Lightbulb className="h-4 w-4 text-amber-500" />
-                    Interpretacion
+                    {t("stats.interpretation")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Los intervalos bootstrap al 95% indican el rango donde se
-                    encuentra la metrica real con un 95% de confianza.
-                    Intervalos con poca superposicion pueden sugerir diferencias,
-                    pero la significancia formal debe consultarse en Cochran Q y
-                    McNemar + Holm.
+                    {t("stats.bootstrapInterpretation")}
                   </p>
                 </div>
               </CardContent>
@@ -472,7 +456,7 @@ export default function StatisticsPage() {
           {loading && !cochran && mcnemar.length === 0 && effectSize.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Cargando...
+              {t("common.loading")}
             </div>
           ) : (
             <>
@@ -481,45 +465,41 @@ export default function StatisticsPage() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <XCircle className="h-5 w-5 text-purple-600" />
-                    Prueba de Cochran Q
+                    {t("stats.cochranTitle")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {!cochran ? (
                     <p className="text-sm text-muted-foreground">
-                      No hay resultados de Cochran Q. Ejecuta{" "}
+                      {t("stats.noCochran")}{" "}
                       <code>src/validacion_estadistica_modelos.py</code>.
                     </p>
                   ) : (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-xs text-muted-foreground">Estadistico Q</p>
+                          <p className="text-xs text-muted-foreground">{t("stats.qStatistic")}</p>
                           <p className="text-lg font-bold">{formatDecimal(cochran.estadisticoQ, 4)}</p>
                         </div>
                         <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-xs text-muted-foreground">Valor p</p>
+                          <p className="text-xs text-muted-foreground">{t("stats.pValue")}</p>
                           <p className="text-lg font-bold">{formatPValue(cochran.pValue)}</p>
                         </div>
                         <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-xs text-muted-foreground">Modelos (k)</p>
+                          <p className="text-xs text-muted-foreground">{t("stats.modelsK")}</p>
                           <p className="text-lg font-bold">{cochran.k}</p>
                         </div>
                         <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-xs text-muted-foreground">Imagenes (n)</p>
+                          <p className="text-xs text-muted-foreground">{t("stats.imagesN")}</p>
                           <p className="text-lg font-bold">{cochran.n}</p>
                         </div>
                       </div>
                       <div className="p-3 bg-muted rounded-lg">
-                        <p className="text-xs text-muted-foreground">Interpretacion</p>
+                        <p className="text-xs text-muted-foreground">{t("stats.interpretation")}</p>
                         <p className="text-sm font-semibold">{cochran.interpretacion}</p>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        La prueba de Cochran Q evalua si todos los modelos tienen
-                        el mismo rendimiento de forma simultanea. Si el valor p es
-                        &lt; 0.05, se rechaza la hipotesis nula. En ese caso, el
-                        post-hoc de McNemar con correccion Holm identifica que
-                        pares tienen diferencias.
+                        {t("stats.cochranInterpretation")}
                       </p>
                     </div>
                   )}
@@ -531,13 +511,13 @@ export default function StatisticsPage() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <XCircle className="h-5 w-5 text-orange-600" />
-                    McNemar + Holm (Post-hoc)
+                    {t("stats.mcnemarTitle")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {mcnemar.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No hay resultados de McNemar. Ejecuta{" "}
+                      {t("stats.noMcNemar")}{" "}
                       <code>src/validacion_estadistica_modelos.py</code>.
                     </p>
                   ) : (
@@ -545,12 +525,12 @@ export default function StatisticsPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Modelo 1</TableHead>
-                            <TableHead>Modelo 2</TableHead>
-                            <TableHead>Valor p original</TableHead>
-                            <TableHead>Valor p ajustado (Holm)</TableHead>
-                            <TableHead>Significativo</TableHead>
-                            <TableHead>Modelo favorecido</TableHead>
+                            <TableHead>{t("stats.model1")}</TableHead>
+                            <TableHead>{t("stats.model2")}</TableHead>
+                            <TableHead>{t("stats.pRaw")}</TableHead>
+                            <TableHead>{t("stats.pHolm")}</TableHead>
+                            <TableHead>{t("stats.significant")}</TableHead>
+                            <TableHead>{t("stats.favoredModel")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -562,15 +542,15 @@ export default function StatisticsPage() {
                               <TableCell className="font-mono">{formatPValue(row.pHolm)}</TableCell>
                               <TableCell>
                                 {row.significativo ? (
-                                  <Badge variant="success">Si</Badge>
+                                  <Badge variant="success">{t("common.yes")}</Badge>
                                 ) : (
-                                  <Badge variant="secondary">No</Badge>
+                                  <Badge variant="secondary">{t("common.no")}</Badge>
                                 )}
                               </TableCell>
                               <TableCell>
                                 {row.favorecido === "Empate" ? (
                                   <span className="flex items-center gap-1 text-muted-foreground">
-                                    <Minus className="h-3 w-3" /> Empate
+                                    <Minus className="h-3 w-3" /> {t("stats.tie")}
                                   </span>
                                 ) : (
                                   <Badge variant={row.favorecido === row.modelo1 ? "success" : "warning"}>
@@ -583,10 +563,7 @@ export default function StatisticsPage() {
                         </TableBody>
                       </Table>
                       <p className="text-xs text-muted-foreground mt-4">
-                        La conclusion se basa en el valor p ajustado por Holm
-                        (p_holm), no en el valor p original. "Favorecido" se
-                        determina por la discordancia b vs c en la tabla de
-                        McNemar.
+                        {t("stats.mcnemarConclusion")}
                       </p>
                     </>
                   )}
@@ -599,20 +576,20 @@ export default function StatisticsPage() {
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Brain className="h-5 w-5 text-cyan-600" />
-                      Tamano del Efecto
+                      {t("stats.effectSize")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Modelo 1</TableHead>
-                          <TableHead>Modelo 2</TableHead>
-                          <TableHead>Diff Accuracy</TableHead>
-                          <TableHead>Diff F1-macro</TableHead>
-                          <TableHead>Diff MCC</TableHead>
-                          <TableHead>Odds Ratio</TableHead>
-                          <TableHead>Favorecido</TableHead>
+                          <TableHead>{t("stats.model1")}</TableHead>
+                          <TableHead>{t("stats.model2")}</TableHead>
+                          <TableHead>{t("stats.diffAccuracy")}</TableHead>
+                          <TableHead>{t("stats.diffF1")}</TableHead>
+                          <TableHead>{t("stats.diffMcc")}</TableHead>
+                          <TableHead>{t("stats.oddsRatio")}</TableHead>
+                          <TableHead>{t("stats.favored")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -636,13 +613,10 @@ export default function StatisticsPage() {
                     <div className="mt-4 p-4 bg-muted rounded-lg space-y-1">
                       <p className="text-sm font-medium flex items-center gap-2">
                         <Lightbulb className="h-4 w-4 text-amber-500" />
-                        Interpretacion
+                        {t("stats.interpretation")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        El tamano del efecto complementa las pruebas de hipotesis.
-                        Una diferencia grande en MCC sugiere una mejora practica
-                        relevante, incluso si la significancia estadistica es
-                        marginal.
+                        {t("stats.effectSizeInterpretation2")}
                       </p>
                     </div>
                   </CardContent>

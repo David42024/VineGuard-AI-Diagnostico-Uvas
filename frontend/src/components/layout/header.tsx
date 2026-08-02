@@ -1,11 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Menu, Globe } from "lucide-react";
+import { Menu, Globe, Sun, Moon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuthStore } from "@/store/auth-store";
 import { useThemeStore } from "@/store/theme-store";
+import { useTheme } from "next-themes";
 import { useTranslation } from "@/i18n";
 import {
   DropdownMenu,
@@ -35,6 +37,10 @@ export function Header() {
   const { user } = useAuthStore();
   const { sidebarCollapsed, setSidebarCollapsed, language, setLanguage } = useThemeStore();
   const t = useTranslation();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const title = Object.entries(pageTitles).find(([path]) =>
     pathname.startsWith(path)
@@ -63,40 +69,59 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background px-3 lg:px-6">
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden"
+        className="lg:hidden shrink-0"
         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
       >
         <Menu className="h-5 w-5" />
       </Button>
 
-      <div className="flex-1">
-        <h1 className="text-lg font-semibold">{pageTitle}</h1>
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-lg font-semibold">{pageTitle}</h1>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <Globe className="h-5 w-5" />
+      <div className="flex shrink-0 items-center gap-1.5">
+        {mounted && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            onClick={() =>
+              setTheme(resolvedTheme === "dark" ? "light" : "dark")
+            }
+          >
+            {resolvedTheme === "dark" ? (
+              <Sun className="h-5 w-5" />
+            ) : (
+              <Moon className="h-5 w-5" />
+            )}
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{t("common.language")}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {languages.map((lang) => (
-            <DropdownMenuItem
-              key={lang.code}
-              onClick={() => setLanguage(lang.code as "es" | "en" | "pt")}
-              className={language === lang.code ? "bg-accent" : ""}
-            >
-              {t(lang.label)}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <Globe className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" sideOffset={8}>
+            <DropdownMenuLabel>{t("common.language")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {languages.map((lang) => (
+              <DropdownMenuItem
+                key={lang.code}
+                onClick={() => setLanguage(lang.code as "es" | "en" | "pt")}
+                className={language === lang.code ? "bg-accent" : ""}
+              >
+                {t(lang.label)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -108,7 +133,7 @@ export function Header() {
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuContent className="w-56" align="end" sideOffset={8} forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">{user?.name}</p>

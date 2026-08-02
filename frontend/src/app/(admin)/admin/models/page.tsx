@@ -16,20 +16,21 @@ import { Brain, RefreshCw, Star, AlertCircle } from "lucide-react";
 import { ErrorState } from "@/components/feedback/error-state";
 import { modelsApi } from "@/lib/api";
 import type { ModelInfo, ModelRanking } from "@/lib/api";
+import { useTranslation } from "@/i18n";
 
 function formatPct(val: number | undefined | null): string {
   return val != null ? `${(val * 100).toFixed(1)}%` : "N/A";
 }
 
-function getStatusLabel(status: string): string {
+function getStatusLabel(t: (key: string) => string, status: string): string {
   const labels: Record<string, string> = {
-    available: "Disponible",
-    unavailable: "No disponible",
-    loaded: "Disponible",
-    training: "Entrenando",
-    pending: "Pendiente",
-    error: "Error",
-    not_loaded: "No disponible",
+    available: t("models.status.available"),
+    unavailable: t("models.status.unavailable"),
+    loaded: t("models.status.available"),
+    training: t("models.status.training"),
+    pending: t("models.status.pending"),
+    error: t("models.status.error"),
+    not_loaded: t("models.status.unavailable"),
   };
   return labels[status] || status;
 }
@@ -46,6 +47,7 @@ function getTypeLabel(type: string): string {
 }
 
 export default function ModelsPage() {
+  const t = useTranslation();
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [ranking, setRanking] = useState<ModelRanking[]>([]);
   const [bestName, setBestName] = useState<string>("");
@@ -65,7 +67,7 @@ export default function ModelsPage() {
       setRanking(rankList);
       setBestName(best?.model_name ?? "");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al cargar modelos");
+      setError(e instanceof Error ? e.message : t("models.loadError"));
     } finally {
       setLoading(false);
     }
@@ -86,29 +88,29 @@ export default function ModelsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">
-            Gestión de Modelos
+            {t("models.title")}
           </h2>
           <p className="text-muted-foreground">
-            Visualiza y gestiona los modelos de IA disponibles
+            {t("models.subtitle")}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Cargar modelos
+          {t("models.loadBtn")}
         </Button>
       </div>
 
       {loading && models.length === 0 && (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-          Cargando modelos...
+          {t("models.loading")}
         </div>
       )}
 
       {!loading && models.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <AlertCircle className="mb-2 h-8 w-8" />
-          <p>No hay modelos disponibles. Ejecuta los entrenamientos desde Streamlit.</p>
+          <p>{t("models.empty")}</p>
         </div>
       )}
 
@@ -122,7 +124,7 @@ export default function ModelsPage() {
                 <div className="absolute right-2 top-2">
                   <Badge variant="success" className="gap-1">
                     <Star className="h-3 w-3" />
-                    Mejor
+                    {t("models.best")}
                   </Badge>
                 </div>
               )}
@@ -136,44 +138,44 @@ export default function ModelsPage() {
                 <div className="flex gap-2">
                   <Badge variant="secondary">{getTypeLabel(model.type)}</Badge>
                   <Badge variant={getStatusVariant(model.status)}>
-                    {getStatusLabel(model.status)}
+                    {getStatusLabel(t, model.status)}
                   </Badge>
                 </div>
                 {m ? (
                   <div className="space-y-2">
                     {m.accuracy != null && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Accuracy</span>
+                        <span className="text-muted-foreground">{t("common.accuracy")}</span>
                         <span className="font-medium">{formatPct(m.accuracy)}</span>
                       </div>
                     )}
                     {m.f1_score != null && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">F1-score</span>
+                        <span className="text-muted-foreground">{t("common.f1Score")}</span>
                         <span className="font-medium">{formatPct(m.f1_score)}</span>
                       </div>
                     )}
                     {m.recall != null && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Recall</span>
+                        <span className="text-muted-foreground">{t("common.recall")}</span>
                         <span className="font-medium">{formatPct(m.recall)}</span>
                       </div>
                     )}
                     {m.precision != null && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Precision</span>
+                        <span className="text-muted-foreground">{t("common.precision")}</span>
                         <span className="font-medium">{formatPct(m.precision)}</span>
                       </div>
                     )}
                     {m.mcc != null && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">MCC</span>
+                        <span className="text-muted-foreground">{t("common.mcc")}</span>
                         <span className="font-medium">{m.mcc.toFixed(4)}</span>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin métricas</p>
+                  <p className="text-sm text-muted-foreground">{t("models.noMetrics")}</p>
                 )}
               </CardContent>
             </Card>
@@ -184,18 +186,18 @@ export default function ModelsPage() {
       {ranking.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Ranking de Modelos</CardTitle>
+            <CardTitle className="text-lg">{t("models.ranking")}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>#</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Accuracy</TableHead>
-                  <TableHead>F1-score</TableHead>
-                  <TableHead>MCC</TableHead>
+                  <TableHead>{t("common.model")}</TableHead>
+                  <TableHead>{t("models.type")}</TableHead>
+                  <TableHead>{t("common.accuracy")}</TableHead>
+                  <TableHead>{t("common.f1Score")}</TableHead>
+                  <TableHead>{t("common.mcc")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

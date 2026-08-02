@@ -4,135 +4,146 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Leaf, Bug, Info, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useTranslation } from "@/i18n";
 
 interface DiseaseInfo {
   id: string;
-  name: string;
+  nameKey: string;
   scientificName: string;
   type: "fungal" | "bacterial" | "healthy";
   severity: "low" | "medium" | "high";
   icon: React.ElementType;
-  description: string;
-  symptoms: string[];
-  recommendations: string[];
+  descriptionKey: string;
+  symptomKeys: string[];
+  recommendationKeys: string[];
 }
 
-const diseases: DiseaseInfo[] = [
+const diseaseData: DiseaseInfo[] = [
   {
     id: "healthy",
-    name: "Hoja Sana",
+    nameKey: "disease.display_healthy",
     scientificName: "Vitis vinifera - estado saludable",
     type: "healthy",
     severity: "low",
     icon: Leaf,
-    description:
-      "Una hoja de vid sana presenta un color verde uniforme, textura firme y ausencia de manchas o deformaciones. Las hojas sanas son esenciales para una fotosíntesis eficiente y una buena producción de uva.",
-    symptoms: [
-      "Color verde uniforme en toda la superficie",
-      "Textura firme y consistente",
-      "Ausencia de manchas, moho o decoloración",
-      "Forma regular y bien definida",
-      "Nervaduras visibles pero no sobresalientes",
+    descriptionKey: "disease.healthy.desc",
+    symptomKeys: [
+      "disease.healthy.symptom1",
+      "disease.healthy.symptom2",
+      "disease.healthy.symptom3",
+      "disease.healthy.symptom4",
+      "disease.healthy.symptom5",
     ],
-    recommendations: [
-      "Mantener el programa de riego establecido",
-      "Continuar con la fertilización balanceada",
-      "Realizar monitoreo semanal preventivo",
-      "Mantener la poda de mantenimiento",
-      "Aplicar fungicidas preventivos según calendario",
+    recommendationKeys: [
+      "disease.healthy.rec1",
+      "disease.healthy.rec2",
+      "disease.healthy.rec3",
+      "disease.healthy.rec4",
+      "disease.healthy.rec5",
     ],
   },
   {
     id: "black_rot",
-    name: "Podredumbre Negra",
+    nameKey: "disease.display_black_rot",
     scientificName: "Guignardia bidwellii",
     type: "fungal",
     severity: "high",
     icon: Bug,
-    description:
-      "Enfermedad fúngica que afecta hojas, brotes y frutos. Se caracteriza por manchas marrones circulares con bordes oscuros que pueden coalescer y causar la caída prematura de las hojas.",
-    symptoms: [
-      "Manchas circulares de color marrón claro a oscuro",
-      "Bordes oscuros bien definidos alrededor de las lesiones",
-      "Puntos negros (picnidios) visibles en el centro",
-      "Amarillamiento del tejido circundante",
-      "Caída prematura de hojas en casos severos",
+    descriptionKey: "disease.black_rot.desc",
+    symptomKeys: [
+      "disease.black_rot.symptom1",
+      "disease.black_rot.symptom2",
+      "disease.black_rot.symptom3",
+      "disease.black_rot.symptom4",
+      "disease.black_rot.symptom5",
     ],
-    recommendations: [
-      "Aplicar fungicidas a base de cobre o azufre",
-      "Eliminar y destruir hojas infectadas",
-      "Mejorar la circulación de aire mediante poda",
-      "Evitar el riego por aspersión sobre el follaje",
-      "Realizar monitoreo frecuente durante temporada de lluvias",
+    recommendationKeys: [
+      "disease.black_rot.rec1",
+      "disease.black_rot.rec2",
+      "disease.black_rot.rec3",
+      "disease.black_rot.rec4",
+      "disease.black_rot.rec5",
     ],
   },
   {
     id: "esca",
-    name: "Esca",
+    nameKey: "disease.esca",
     scientificName: "Phaeomoniella chlamydospora, Phaeoacremonium aleophilum",
     type: "fungal",
     severity: "high",
     icon: AlertTriangle,
-    description:
-      "Enfermedad de la madera de la vid que causa decaimiento progresivo. En las hojas se manifiesta como un patrón de clorosis intervenal con manchas necróticas, conocido como 'tigrado'.",
-    symptoms: [
-      "Clorosis intervenal (amarillamiento entre nervaduras)",
-      "Manchas necróticas de color marrón rojizo",
-      "Patrón característico de 'tigrado' en la hoja",
-      "Bordes de las hojas enrollados hacia arriba",
-      "Decaimiento general y muerte regresiva de brazos",
-      "Síntomas más visibles en verano",
+    descriptionKey: "disease.esca.desc",
+    symptomKeys: [
+      "disease.esca.symptom1",
+      "disease.esca.symptom2",
+      "disease.esca.symptom3",
+      "disease.esca.symptom4",
+      "disease.esca.symptom5",
+      "disease.esca.symptom6",
     ],
-    recommendations: [
-      "No existe cura; enfocarse en prevención",
-      "Podar y eliminar brazos afectados",
-      "Desinfectar herramientas de poda entre cada corte",
-      "Evitar heridas innecesarias en la planta",
-      "Considerar replantación en casos severos",
-      "Aplicar fungicidas protectores en heridas de poda",
+    recommendationKeys: [
+      "disease.esca.rec1",
+      "disease.esca.rec2",
+      "disease.esca.rec3",
+      "disease.esca.rec4",
+      "disease.esca.rec5",
+      "disease.esca.rec6",
     ],
   },
   {
     id: "leaf_blight",
-    name: "Tizón de la Hoja",
+    nameKey: "disease.display_leaf_blight",
     scientificName: "Pseudocercospora vitis",
     type: "fungal",
     severity: "medium",
     icon: Bug,
-    description:
-      "Enfermedad foliar causada por un hongo que produce manchas angulares de color marrón oscuro a negro, generalmente limitadas por las nervaduras de la hoja.",
-    symptoms: [
-      "Manchas angulares pequeñas de color marrón oscuro",
-      "Lesiones delimitadas por las nervaduras",
-      "Color amarillo-anaranjado alrededor de las lesiones",
-      "Caída prematura de hojas en infecciones severas",
-      "Pérdida de vigor y reducción de la fotosíntesis",
+    descriptionKey: "disease.leaf_blight.desc",
+    symptomKeys: [
+      "disease.leaf_blight.symptom1",
+      "disease.leaf_blight.symptom2",
+      "disease.leaf_blight.symptom3",
+      "disease.leaf_blight.symptom4",
+      "disease.leaf_blight.symptom5",
     ],
-    recommendations: [
-      "Aplicar fungicidas protectantes al inicio de los síntomas",
-      "Mantener el follaje seco (riego por goteo)",
-      "Realizar podas para mejorar aireación",
-      "Eliminar hojas infectadas del suelo",
-      "Rotar fungicidas para evitar resistencias",
+    recommendationKeys: [
+      "disease.leaf_blight.rec1",
+      "disease.leaf_blight.rec2",
+      "disease.leaf_blight.rec3",
+      "disease.leaf_blight.rec4",
+      "disease.leaf_blight.rec5",
     ],
   },
 ];
 
 export default function DiseasesPage() {
+  const t = useTranslation();
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Enfermedades Reconocidas
+          {t("diseases.title")}
         </h2>
         <p className="text-muted-foreground">
-          Información sobre las enfermedades que VineGuard AI puede detectar
+          {t("diseases.subtitle")}
         </p>
       </div>
 
       <div className="grid gap-6">
-        {diseases.map((disease) => {
+        {diseaseData.map((disease) => {
           const Icon = disease.icon;
+          const typeLabel =
+            disease.type === "healthy"
+              ? t("diseases.type.healthy")
+              : disease.type === "fungal"
+              ? t("diseases.type.fungal")
+              : t("diseases.type.bacterial");
+          const severityLabel =
+            disease.severity === "high"
+              ? t("diseases.severity.high")
+              : disease.severity === "medium"
+              ? t("diseases.severity.medium")
+              : t("diseases.severity.low");
           return (
             <Card key={disease.id} className="overflow-hidden">
               <div
@@ -163,7 +174,7 @@ export default function DiseasesPage() {
                       />
                     </div>
                     <div>
-                      <CardTitle className="text-xl">{disease.name}</CardTitle>
+                      <CardTitle className="text-xl">{t(disease.nameKey)}</CardTitle>
                       <p className="text-sm text-muted-foreground italic">
                         {disease.scientificName}
                       </p>
@@ -179,11 +190,7 @@ export default function DiseasesPage() {
                           : "warning"
                       }
                     >
-                      {disease.type === "healthy"
-                        ? "Saludable"
-                        : disease.type === "fungal"
-                        ? "Fúngica"
-                        : "Bacteriana"}
+                      {typeLabel}
                     </Badge>
                     <Badge
                       variant={
@@ -194,19 +201,14 @@ export default function DiseasesPage() {
                           : "success"
                       }
                     >
-                      {disease.severity === "high"
-                        ? "Alta"
-                        : disease.severity === "medium"
-                        ? "Media"
-                        : "Baja"}{" "}
-                      severidad
+                      {severityLabel} {t("diseases.severityWord")}
                     </Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  {disease.description}
+                  {t(disease.descriptionKey)}
                 </p>
 
                 <Separator />
@@ -215,16 +217,16 @@ export default function DiseasesPage() {
                   <div>
                     <h4 className="flex items-center gap-2 text-sm font-semibold mb-3">
                       <AlertTriangle className="h-4 w-4 text-red-500" />
-                      Síntomas
+                      {t("diseases.symptoms")}
                     </h4>
                     <ul className="space-y-2">
-                      {disease.symptoms.map((symptom, i) => (
+                      {disease.symptomKeys.map((key, i) => (
                         <li
                           key={i}
                           className="flex items-start gap-2 text-sm"
                         >
                           <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
-                          {symptom}
+                          {t(key)}
                         </li>
                       ))}
                     </ul>
@@ -232,16 +234,16 @@ export default function DiseasesPage() {
                   <div>
                     <h4 className="flex items-center gap-2 text-sm font-semibold mb-3">
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      Recomendaciones
+                      {t("diseases.recommendations")}
                     </h4>
                     <ul className="space-y-2">
-                      {disease.recommendations.map((rec, i) => (
+                      {disease.recommendationKeys.map((key, i) => (
                         <li
                           key={i}
                           className="flex items-start gap-2 text-sm"
                         >
                           <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" />
-                          {rec}
+                          {t(key)}
                         </li>
                       ))}
                     </ul>
@@ -259,14 +261,10 @@ export default function DiseasesPage() {
             <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground">
               <p className="font-semibold text-foreground mb-1">
-                ¿Cómo usar esta información?
+                {t("diseases.howToTitle")}
               </p>
               <p>
-                Esta guía es educativa y de referencia. Los resultados del
-                diagnóstico automático deben ser verificados por un profesional.
-                Si sospechas de una enfermedad en tus cultivos, contacta a un
-                ingeniero agrónomo o especialista fitosanitario para una
-                evaluación precisa.
+                {t("diseases.howToDesc")}
               </p>
             </div>
           </div>

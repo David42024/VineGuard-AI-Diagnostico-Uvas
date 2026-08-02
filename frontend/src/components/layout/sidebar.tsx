@@ -123,7 +123,7 @@ export function Sidebar() {
               </div>
             )}
             {adminItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
@@ -152,7 +152,7 @@ export function Sidebar() {
           </div>
         )}
         {clientItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          const isActive = pathname === item.href;
           return (
             <Link
               key={item.href}
@@ -194,7 +194,7 @@ export function Sidebar() {
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" sideOffset={8}>
             <DropdownMenuItem onClick={() => setLanguage("es")}>
               Español
             </DropdownMenuItem>

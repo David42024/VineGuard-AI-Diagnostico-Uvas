@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { StoreHydrator } from "@/components/store-hydrator";
 import { Toaster } from "@/components/ui/toast";
 import { Chatbot } from "@/components/Chatbot/Chatbot";
 
@@ -28,6 +29,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <StoreHydrator />
           <Toaster />
           <Chatbot />
         </ThemeProvider>
